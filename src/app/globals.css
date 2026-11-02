@@ -88,6 +88,9 @@
 .icon-container > svg { display: block; width: 100%; height: 100%; }
 .pocket-dialog-scroll { scrollbar-gutter: stable; overscroll-behavior: contain; }
 
+input[type="date"], input[type="month"] { box-sizing: border-box; display: block; min-width: 0; max-width: 100%; }
+input::-webkit-date-and-time-value { min-width: 0; text-align: left; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0s !important; transition-duration: 0s !important; }
 }
