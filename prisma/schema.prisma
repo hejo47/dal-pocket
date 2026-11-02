@@ -1,0 +1,43 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["pocket"]
+}
+
+model Pocket {
+  id            String    @id @db.Char(64)
+  revision      Int       @default(0)
+  mode          String    @default("weekly") @db.VarChar(7)
+  weeklyBudget  Int       @default(250000)
+  monthlyBudget Int       @default(500000)
+  weekStartsOn  Int       @default(1)
+  bodyFont      String    @default("chai") @db.VarChar(9)
+  numberFont    String    @default("chai") @db.VarChar(9)
+  titleFont     String    @default("chai") @db.VarChar(9)
+  fontsChosen   Boolean   @default(true)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(3)
+  expenses      Expense[]
+
+  @@schema("pocket")
+}
+
+model Expense {
+  pocketId String   @db.Char(64)
+  id       String   @db.VarChar(100)
+  amount   Int
+  category String   @db.VarChar(10)
+  date     DateTime @db.Date
+  memo     String   @db.VarChar(80)
+  position Int
+  pocket   Pocket   @relation(fields: [pocketId], references: [id], onDelete: Cascade)
+
+  @@id([pocketId, id])
+  @@index([pocketId, date])
+  @@schema("pocket")
+}

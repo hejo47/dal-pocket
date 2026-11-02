@@ -1,0 +1,30 @@
+@font-face { font-family: "Pretendard"; src: url("/fonts/pretendard-regular.1.3.9.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: swap; }
+@font-face { font-family: "Pretendard"; src: url("/fonts/pretendard-semibold.1.3.9.woff2") format("woff2"); font-style: normal; font-weight: 600; font-display: swap; }
+@font-face { font-family: "RisingChai"; src: url("/fonts/rising-chai-light.woff2") format("woff2"); font-style: normal; font-weight: 300; font-display: swap; }
+@font-face { font-family: "RisingChai"; src: url("/fonts/rising-chai-extra-bold.woff2") format("woff2"); font-style: normal; font-weight: 800; font-display: swap; }
+@font-face { font-family: "YOnlyYouShine"; src: url("/fonts/y-spotlight.1.0.woff") format("woff"); font-style: normal; font-weight: 400; font-display: swap; }
+
+/* Each digit-only face stays first in all text stacks, including point headings. */
+@font-face { font-family: "PretendardNumbers"; src: url("/fonts/pretendard-regular.1.3.9.woff2") format("woff2"); font-weight: 400; font-display: swap; unicode-range: U+0025, U+002B-002E, U+0030-003A, U+2212; }
+@font-face { font-family: "ChaiNumbers"; src: url("/fonts/rising-chai-light.woff2") format("woff2"); font-weight: 300; font-display: swap; unicode-range: U+0025, U+002B-002E, U+0030-003A, U+2212; }
+@font-face { font-family: "ChaiNumbers"; src: url("/fonts/rising-chai-extra-bold.woff2") format("woff2"); font-weight: 800; font-display: swap; unicode-range: U+0025, U+002B-002E, U+0030-003A, U+2212; }
+@font-face { font-family: "SpotlightNumbers"; src: url("/fonts/y-spotlight.1.0.woff") format("woff"); font-weight: 400; font-display: swap; unicode-range: U+0025, U+002B-002E, U+0030-003A, U+2212; }
+
+:root {
+  /* Selected: Rising Chai. Static source files provide only weights 300 and 800. */
+  --font-option-pretendard: "Pretendard";
+  --font-option-chai: "RisingChai";
+  --font-option-spotlight: "YOnlyYouShine";
+  --font-option-spotlight-digits: "SpotlightNumbers";
+  --font-option-pretendard-digits: "PretendardNumbers";
+  --font-option-chai-digits: "ChaiNumbers";
+  --font-body: var(--font-option-chai);
+  --font-body-weight: 500;
+  --font-title: var(--font-option-chai);
+  --font-title-weight: 700;
+  --font-heading-weight: 600;
+  --font-point: var(--font-title);
+  --font-number: var(--font-option-chai);
+  --font-number-weight: 500;
+  --font-number-glyphs: var(--font-option-chai-digits);
+}

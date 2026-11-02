@@ -1,0 +1,91 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme {
+  --color-white: #ffffff;
+  --color-black-100: #111111;
+  --color-black-030: #535353;
+  --color-black-020: #919191;
+  --color-black-010: #e5e5e5;
+  --color-black-005: #eeeeee;
+  --color-black-002: #f6f6f6;
+  --container-page: 480px;
+  --container-content: 432px;
+  --container-modal: 450px;
+  --spacing-modal-gutter: 15px;
+  --spacing-select-arrow: 13px;
+  --leading-130: 1.3;
+  --leading-140: 1.4;
+  --leading-150: 1.5;
+  --leading-160: 1.6;
+  --leading-180: 1.8;
+  --tracking-pt: -0.02em;
+  --shadow-modal: 0 16px 48px rgb(0 0 0 / 0.2);
+}
+
+@layer base {
+  * { border-color: var(--color-black-010); }
+  html { color-scheme: light; background: var(--color-black-002); }
+  body { margin: 0; color: var(--color-black-100); }
+  h2, h3 { font-weight: var(--font-heading-weight); }
+  button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+  button, input, select, textarea { font: inherit; }
+  button, a { touch-action: manipulation; }
+  button:disabled { cursor: not-allowed; }
+  :focus-visible { outline: 2px solid var(--color-black-100); outline-offset: 3px; }
+}
+
+@utility font-body {
+  font-family: var(--font-number-glyphs), var(--font-body), system-ui, sans-serif;
+  font-weight: var(--font-body-weight);
+  font-synthesis: none;
+  font-variant-numeric: tabular-nums;
+}
+@utility font-point {
+  font-family: var(--font-number-glyphs), var(--font-title), var(--font-body), system-ui, sans-serif;
+  font-synthesis: none;
+  font-weight: var(--font-title-weight);
+}
+@utility font-numbers {
+  font-family: var(--font-number), system-ui, sans-serif;
+  font-synthesis: none;
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-number-weight);
+  letter-spacing: 0;
+}
+@utility font-pretendard {
+  font-family: var(--font-number-glyphs), "Pretendard", system-ui, sans-serif;
+  font-synthesis: none;
+}
+@utility font-preview-pretendard {
+  font-family: var(--font-option-pretendard), system-ui, sans-serif;
+  font-weight: 400;
+  font-synthesis: none;
+  font-variant-numeric: tabular-nums;
+}
+@utility font-preview-chai {
+  font-family: var(--font-option-chai), system-ui, sans-serif;
+  font-weight: var(--font-body-weight);
+  font-synthesis: none;
+  font-variant-numeric: tabular-nums;
+}
+@utility font-preview-spotlight {
+  font-family: var(--font-option-spotlight), system-ui, sans-serif;
+  font-weight: 400;
+  font-synthesis: none;
+  font-variant-numeric: tabular-nums;
+}
+@utility font-preview-chai-title {
+  font-family: var(--font-option-chai), system-ui, sans-serif;
+  font-weight: var(--font-title-weight);
+  font-synthesis: none;
+}
+@utility max-h-dialog { max-height: calc(100dvh - var(--spacing-modal-gutter) * 2); }
+@utility pb-footer { padding-bottom: calc(12rem + env(safe-area-inset-bottom)); }
+
+.icon-container > svg { display: block; width: 100%; height: 100%; }
+.pocket-dialog-scroll { scrollbar-gutter: stable; overscroll-behavior: contain; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0s !important; transition-duration: 0s !important; }
+}

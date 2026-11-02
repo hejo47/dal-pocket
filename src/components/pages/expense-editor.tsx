@@ -1,0 +1,49 @@
+"use client";
+
+import { useState } from "react";
+import type { FormEvent } from "react";
+
+import { usePocket } from "@/components/providers/pocket-provider";
+import { ActionButtonRow } from "@/components/ui/action-button-row";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DateField, FieldError, FieldHint, FieldLabel, SelectField, TextField } from "@/components/ui/form-field";
+
+import { CATEGORIES, formatMoney, isDateKey, parseAmount, validAmount } from "@/lib/pocket";
+import type { Category } from "@/lib/pocket";
+
+export function ExpenseEditor() {
+  const pocket = usePocket();
+  const { editor, updateDraft } = pocket;
+  const [error, setError] = useState("");
+  const editing = editor.expenseId !== null;
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    const amount = parseAmount(editor.draft.amount);
+    if (!validAmount(amount)) { setError("지출 금액을 1원부터 1억 원까지 입력해주세요."); return; }
+    if (!isDateKey(editor.draft.date) || editor.draft.date > pocket.today) { setError("오늘 또는 이전 날짜를 선택해주세요."); return; }
+    setError("");
+    pocket.saveExpense(amount);
+  }
+  return <Dialog open={editor.open} onOpenChange={(open) => { if (!open) pocket.closeEditor(); }}>
+    <DialogContent onCloseAutoFocus={(event) => { event.preventDefault(); pocket.restoreEditorFocus(); }} onOpenAutoFocus={(event) => {
+      event.preventDefault();
+      document.querySelector<HTMLButtonElement>("[data-dialog-close]")?.focus({ preventScroll: true });
+    }}>
+      <DialogHeader><DialogTitle>{editing ? "지출 수정" : "지출 추가"}</DialogTitle><DialogDescription>금액과 카테고리를 입력해주세요.</DialogDescription></DialogHeader>
+      <form id="expense-form" onSubmit={submit} className="flex min-h-0 flex-col gap-5">
+        <div className="pocket-dialog-scroll flex min-h-0 flex-col gap-5 overflow-y-auto p-1">
+          <div className="flex flex-col gap-2"><FieldLabel htmlFor="expense-amount" required>지출 금액</FieldLabel><div className="flex items-center gap-2 rounded-lg border border-black-010 px-3 py-3"><TextField id="expense-amount" required inputMode="numeric" autoComplete="off" placeholder="0" className="font-numbers border-0 px-0 py-0 text-3xl" value={editor.draft.amount ? formatMoney(parseAmount(editor.draft.amount)) : ""} onChange={(event) => { updateDraft({ amount: event.target.value.replace(/\D/g, "").slice(0, 9) }); setError(""); }} /><span className="text-sm text-black-030">원</span></div></div>
+          <div className="flex flex-col gap-2"><FieldLabel htmlFor="expense-category" required>카테고리</FieldLabel><SelectField id="expense-category" value={editor.draft.category} options={CATEGORIES.map((category) => ({ value: category, label: category }))} onChange={(event) => updateDraft({ category: event.target.value as Category })} /></div>
+          <div className="flex flex-col gap-2"><FieldLabel htmlFor="expense-date" required>날짜</FieldLabel><DateField id="expense-date" required max={pocket.today} value={editor.draft.date} onChange={(event) => { updateDraft({ date: event.target.value }); setError(""); }} /></div>
+          <div className="flex flex-col gap-2"><FieldLabel htmlFor="expense-memo">소비 내용 <span className="text-xs">선택</span></FieldLabel><TextField id="expense-memo" maxLength={80} placeholder="예: 친구와 점심" value={editor.draft.memo} onChange={(event) => updateDraft({ memo: event.target.value })} /></div>
+          {pocket.data.isDemo && !editing && <FieldHint>첫 지출을 저장하면 예시 내역 대신 내 기록을 시작합니다.</FieldHint>}
+          <FieldError>{error}</FieldError>
+        </div>
+        <DialogFooter><ActionButtonRow buttons={[
+          ...(editing ? [{ label: "삭제", variant: "outline" as const, onClick: pocket.deleteExpense }] : []),
+          { label: "저장", type: "submit" },
+        ]} /></DialogFooter>
+      </form>
+    </DialogContent>
+  </Dialog>;
+}
