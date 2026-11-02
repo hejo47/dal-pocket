@@ -39,7 +39,7 @@ function usePocketController() {
     setNotice({ message: persisted ? message : `${message} 브라우저 저장을 사용할 수 없어 새로고침하면 사라질 수 있습니다.` });
   }
   function setMode(mode: BudgetMode) {
-    updatePocket((current) => ({ ...current, mode }));
+    updatePocket((current) => ({ ...current, mode }), { sync: false });
   }
   function saveFinance(finance: Finance) {
     const persisted = updatePocket((current) => ({ ...current, finance, isDemo: false, expenses: current.isDemo ? [] : current.expenses }));

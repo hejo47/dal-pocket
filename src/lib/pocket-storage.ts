@@ -195,15 +195,16 @@ export function subscribe(listener: () => void) {
   };
 }
 
-export function updatePocket(updater: (current: PocketData) => PocketData) {
+export function updatePocket(updater: (current: PocketData) => PocketData, options: { sync?: boolean } = {}) {
+  const shouldSync = options.sync !== false;
   const current = getSnapshot();
   const data = updater(current.data);
   if (!isPocketData(data)) throw new Error("저장할 내용을 확인해주세요.");
   snapshot = { ...current, data, today: todayInSeoul() };
-  syncMeta = { ...syncMeta, dirty: !data.isDemo };
+  if (shouldSync) syncMeta = { ...syncMeta, dirty: !data.isDemo };
   const persisted = persist();
   emit();
-  if (!data.isDemo && cloudEnabled && current.storage !== "conflict" && current.storage !== "error") {
+  if (shouldSync && !data.isDemo && cloudEnabled && current.storage !== "conflict" && current.storage !== "error") {
     pending = data;
     void flushCloud();
   }
