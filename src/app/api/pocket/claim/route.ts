@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
       if (type === "installments") finance.installments = [...entries.values()].filter((item): item is import("@/lib/finance").Installment => "months" in item);
       else finance[type] = [...entries.values()];
     }
+    finance.fixedExpenses = [...new Map(financialSources.flatMap((item) => item.fixedExpenses ?? []).map((item) => [item.id, item])).values()];
     const merged = {
       ...base, finance,
       categories: [...new Set(sources.flatMap((source) => source.categories))].slice(0, 30),

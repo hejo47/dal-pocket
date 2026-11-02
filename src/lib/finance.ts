@@ -3,12 +3,14 @@ import type { PocketData, Period } from "./pocket.ts";
 
 export type MoneyEntry = { id: string; date: string; amount: number; memo: string };
 export type Installment = MoneyEntry & { months: number };
+export type FixedExpense = MoneyEntry & { endMonth?: string; includeInBudget?: boolean };
 export type Payment = { gross: number; split: number; method: "cash" | "card"; settled: boolean; settledDate: string; note?: string; groceries?: boolean };
 export type Finance = {
   months: Record<string, { budget: number; groceries: number }>;
   openingBalance: number; openingDate: string; billingDay: number; closingDay?: number; billingOffset?: number;
   incomes: MoneyEntry[]; plans: MoneyEntry[]; installments: Installment[];
   payments: Record<string, Payment>;
+  fixedExpenses?: FixedExpense[];
 };
 export const emptyFinance = (): Finance => ({ months: {}, openingBalance: 0, openingDate: "2000-01-01", billingDay: 15, incomes: [], plans: [], installments: [], payments: {} });
 export function isFinance(value: unknown): value is Finance {
@@ -21,12 +23,29 @@ export function isFinance(value: unknown): value is Finance {
     && Array.isArray(data.incomes) && data.incomes.length <= 10000 && data.incomes.every(entry)
     && Array.isArray(data.plans) && data.plans.length <= 10000 && data.plans.every(entry)
     && Array.isArray(data.installments) && data.installments.length <= 1000 && data.installments.every((item) => entry(item) && Number.isInteger(item.months) && item.months >= 2 && item.months <= 60)
+    && (data.fixedExpenses === undefined || Array.isArray(data.fixedExpenses) && data.fixedExpenses.length <= 1000 && data.fixedExpenses.every((item) => entry(item) && (item.includeInBudget === undefined || typeof item.includeInBudget === "boolean") && (!item.endMonth || isDateKey(item.endMonth + "-01") && item.endMonth >= item.date.slice(0, 7))))
     && !!data.payments && typeof data.payments === "object" && Object.values(data.payments).every((item) => item && amount(item.gross) && Number.isInteger(item.split) && item.split >= 1 && item.split <= 100 && ["cash", "card"].includes(item.method) && (item.groceries === undefined || typeof item.groceries === "boolean") && typeof item.settled === "boolean" && isDateKey(item.settledDate) && (item.note === undefined || typeof item.note === "string" && item.note.length <= 200));
 }
 export const financeOf = (data: PocketData): Finance => ({ ...emptyFinance(), ...data.finance });
 export function monthDays(month: string) { return Number(getPeriod("monthly", 1, `${month}-01`).end.slice(8)); }
 export function monthSettings(data: PocketData, month: string) {
   return financeOf(data).months[month] ?? { budget: 0, groceries: 0 };
+}
+export function fixedDueDate(item: FixedExpense, month: string) {
+  if (month < item.date.slice(0, 7) || item.endMonth && month > item.endMonth) return null;
+  return month + "-" + String(Math.min(Number(item.date.slice(8)), monthDays(month))).padStart(2, "0");
+}
+export function fixedTotal(data: PocketData, start: string, end: string, budgetOnly = false) {
+  const monthIndex = (month: string) => Number(month.slice(0, 4)) * 12 + Number(month.slice(5, 7));
+  return (financeOf(data).fixedExpenses ?? []).filter((item) => !budgetOnly || item.includeInBudget).reduce((sum, item) => {
+    const first = item.date.slice(0, 7) > start.slice(0, 7) ? item.date.slice(0, 7) : start.slice(0, 7);
+    const last = item.endMonth && item.endMonth < end.slice(0, 7) ? item.endMonth : end.slice(0, 7);
+    if (first > last) return sum;
+    let count = monthIndex(last) - monthIndex(first) + 1;
+    if (fixedDueDate(item, first)! < start) count--;
+    if (fixedDueDate(item, last)! > end) count--;
+    return sum + Math.max(0, count) * item.amount;
+  }, 0);
 }
 export function allocatedBudget(data: PocketData, period: Period) {
   const total = monthSettings(data, period.start.slice(0, 7)).budget;
@@ -38,18 +57,21 @@ export function financeSummary(data: PocketData, period: Period) {
   const month = period.start.slice(0, 7);
   const total = monthSettings(data, month).budget;
   const priorSpent = sumExpenses(data.expenses.filter((expense) => expense.date >= `${month}-01` && expense.date < period.start));
+  const priorFixed = fixedTotal(data, month + "-01", period.start, true) - fixedTotal(data, period.start, period.start, true);
   const priorAllocation = Math.floor(total * (Number(period.start.slice(8)) - 1) / monthDays(month));
   let priorDebt = 0;
   for (const [previousMonth, setting] of Object.entries(financeOf(data).months).filter(([key]) => key < month).sort(([a],[b]) => a.localeCompare(b))) {
     const spentBefore = sumExpenses(data.expenses.filter((expense) => expense.date.slice(0,7) === previousMonth));
-    priorDebt = Math.max(0, priorDebt + spentBefore - setting.budget);
+    priorDebt = Math.max(0, priorDebt + spentBefore + fixedTotal(data, previousMonth + "-01", getPeriod("monthly", 1, previousMonth + "-01").end, true) - setting.budget);
   }
-  const carried = period.mode === "weekly" ? Math.max(0, priorDebt + priorSpent - priorAllocation) : priorDebt;
+  const carried = period.mode === "weekly" ? Math.max(0, priorDebt + priorSpent + priorFixed - priorAllocation) : priorDebt;
   const budget = Math.max(0, allocatedBudget(data, period) - carried);
-  const spent = sumExpenses(data.expenses.filter((expense) => expense.date >= period.start && expense.date <= period.end));
+  const regularSpent = sumExpenses(data.expenses.filter((expense) => expense.date >= period.start && expense.date <= period.end));
+  const fixedSpent = fixedTotal(data, period.start, period.end);
+  const spent = regularSpent + fixedTotal(data, period.start, period.end, true);
   const remaining = budget - spent;
   const reserved = financeOf(data).plans.filter((plan) => plan.date >= period.start && plan.date <= period.end).reduce((sum, plan) => sum + plan.amount, 0);
-  return { budget, spent, remaining, carried, reserved, usedPercent: budget ? Math.round(spent / budget * 100) : spent ? 100 : 0, dailyAvailable: Math.max(0, Math.floor((remaining - reserved) / period.remainingDays)), dailyAverage: Math.floor(spent / period.elapsedDays) };
+  return { regularSpent, fixedSpent, budget, spent, remaining, carried, reserved, usedPercent: budget ? Math.round(spent / budget * 100) : spent ? 100 : 0, dailyAvailable: Math.max(0, Math.floor((remaining - reserved) / period.remainingDays)), dailyAverage: Math.floor(spent / period.elapsedDays) };
 }
 export function nextMonth(month: string, offset = 1) { return new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)) - 1 + offset, 1)).toISOString().slice(0, 7); }
 export function installmentDue(item: Installment, month: string) {
@@ -86,8 +108,10 @@ export function cashFlow(data: PocketData, month: string) {
   const installmentMonth = finance.installments.reduce((sum, item) => sum + installmentDue(item, month), 0);
   const planned = finance.plans.filter((entry) => entry.date.slice(0, 7) === month).reduce((sum, entry) => sum + entry.amount, 0);
   const monthSpent = sumExpenses(data.expenses.filter((expense) => expense.date.slice(0,7) === month));
-  const livingRemaining = monthSettings(data, month).budget - monthSpent - planned;
-  const balance = finance.openingBalance + income + received - cashOut - cardOut - installments;
+  const fixedMonth = fixedTotal(data, month + "-01", end);
+  const fixedOut = fixedTotal(data, finance.openingDate, end);
+  const livingRemaining = monthSettings(data, month).budget - monthSpent - planned - fixedTotal(data, month + "-01", end, true);
+  const balance = finance.openingBalance + income + received - cashOut - cardOut - installments - fixedOut;
   const availableBalance = balance - futureCard - installmentOutstanding - planned;
-  return { availableBalance, installmentOutstanding, futureCard, balance, income, cashOut, cardOut, received, receivable, installmentMonth, dueThisMonth, planned, recommendedLimit: Math.max(0, Math.min(livingRemaining, availableBalance)) };
+  return { fixedMonth, fixedOut, monthSpent, availableBalance, installmentOutstanding, futureCard, balance, income, cashOut, cardOut, received, receivable, installmentMonth, dueThisMonth, planned, recommendedLimit: Math.max(0, Math.min(livingRemaining, availableBalance)) };
 }
