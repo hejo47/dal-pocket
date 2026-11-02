@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 
-import { getBudgetSummary, getPeriod, getPeriodExpenses, todayInSeoul } from "@/lib/pocket";
+import { CATEGORIES, getBudgetSummary, getPeriod, getPeriodExpenses, todayInSeoul } from "@/lib/pocket";
 import type { BudgetMode, Category, Expense, FontPreferences } from "@/lib/pocket";
 import { getServerSnapshot, getSnapshot, loadServerCopy, retryCloud, subscribe, updatePocket } from "@/lib/pocket-storage";
 
@@ -38,6 +38,13 @@ function usePocketController() {
   }
   function setMode(mode: BudgetMode) {
     updatePocket((current) => ({ ...current, mode }));
+  }
+  function addCategory(value: string) {
+    const name = value.trim();
+    if (!name || name.length > 10 || CATEGORIES.includes(name as (typeof CATEGORIES)[number]) || data.categories.includes(name) || data.categories.length >= 30) return false;
+    const persisted = updatePocket((current) => ({ ...current, categories: [...current.categories, name] }));
+    notify("카테고리를 추가했습니다.", persisted);
+    return true;
   }
   function saveBudget(amount: number, weekStartsOn: number) {
     const persisted = updatePocket((current) => ({ ...current, budgets: { ...current.budgets, [current.mode]: amount }, weekStartsOn, isDemo: false, expenses: current.isDemo ? [] : current.expenses }));
@@ -94,7 +101,7 @@ function usePocketController() {
   }
 
   return { data, today, ready, storage, retryCloud, loadServerCopy, period, expenses, summary, category, setCategory, setMode,
-    saveBudget, notice, dismissNotice, editor, openEditor, closeEditor,
+    saveBudget, addCategory, notice, dismissNotice, editor, openEditor, closeEditor,
     updateDraft, saveExpense, deleteExpense, restoreEditorFocus, startOwnRecords, saveFonts };
 }
 

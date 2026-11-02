@@ -8,7 +8,6 @@ import { CalendarDays, ChartNoAxesCombined, House, NotebookPen, Plus, Wallet } f
 import { ExpenseEditor } from "@/components/pages/expense-editor";
 import { usePocket } from "@/components/providers/pocket-provider";
 import { PocketToasts } from "@/components/providers/pocket-toasts";
-import { ActionButtonRow } from "@/components/ui/action-button-row";
 import { IconContainer } from "@/components/ui/icon-container";
 import { PillButton } from "@/components/ui/pill-button";
 
@@ -34,8 +33,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       {pocket.ready && pocket.data.isDemo && <div className="flex items-center justify-between gap-3 rounded-lg bg-black-002 px-3 py-2"><span className="text-xs leading-150 text-black-030">예시 데이터를 보고 있어요</span><PillButton variant="ghost" size="sm" onClick={pocket.startOwnRecords}>내 기록 시작</PillButton></div>}
     </div>}
     <main id="main-content" className="flex flex-1 flex-col px-6 pt-6 pb-footer">{children}</main>
+    {showAdd && <div className="fixed inset-x-0 bottom-20 z-40 mx-auto flex w-full max-w-page justify-end px-6"><PillButton id="add-expense" aria-label="지출 추가" title="지출 추가" size="icon" className="rounded-full px-3 py-3 shadow-lg" onClick={() => pocket.openEditor()} disabled={!pocket.ready}><IconContainer size="slg"><Plus /></IconContainer></PillButton></div>}
     <footer className="fixed inset-x-0 bottom-0 mx-auto flex w-full max-w-page flex-col gap-2 border-t border-black-010 bg-white px-6 pt-0 pb-0">
-      {showAdd && <ActionButtonRow buttons={[{ id: "add-expense", label: <><IconContainer size="slg"><Plus /></IconContainer>지출 추가</>, onClick: () => pocket.openEditor(), disabled: !pocket.ready }]} />}
       <nav aria-label="주요 화면" className="flex w-full gap-2">{navigation.map(({ href, label, icon: Icon }) => <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined} className={cn("flex flex-1 flex-col items-center justify-center gap-1 border-t-2 px-1 py-3 text-xs leading-150", pathname === href ? "border-black-100 text-black-100" : "border-transparent text-black-030")}><IconContainer size="slg"><Icon /></IconContainer>{label}</Link>)}</nav>
     </footer>
     <ExpenseEditor />

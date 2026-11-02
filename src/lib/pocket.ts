@@ -2,7 +2,7 @@ export const CATEGORIES = ["식비", "카페", "교통", "쇼핑", "여가", "�
 export const WEEKDAYS = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"] as const;
 export const FONT_NAMES = { spotlight: "Y 너만을 비춤체", chai: "차이 상승체" } as const;
 
-export type Category = (typeof CATEGORIES)[number];
+export type Category = string;
 export type BudgetMode = "weekly" | "monthly";
 export type FontChoice = keyof typeof FONT_NAMES;
 export type Expense = { id: string; amount: number; category: Category; date: string; memo: string };
@@ -14,6 +14,7 @@ export type PocketData = {
   budgets: Record<BudgetMode, number>;
   weekStartsOn: number;
   expenses: Expense[];
+  categories: Category[];
   fonts: FontPreferences;
   isDemo: boolean;
 };
@@ -128,7 +129,7 @@ export function getBudgetSummary(configuredBudget: number, expenses: Expense[], 
 
 export function getCategoryTotals(expenses: Expense[]) {
   const total = sumExpenses(expenses);
-  return CATEGORIES.map((category) => {
+  return [...new Set([...CATEGORIES, ...expenses.map((expense) => expense.category)])].map((category) => {
     const amount = sumExpenses(expenses.filter((expense) => expense.category === category));
     return { category, amount, percent: total ? Math.round(amount / total * 100) : 0 };
   }).filter((group) => group.amount > 0).sort((a, b) => b.amount - a.amount);
@@ -152,7 +153,7 @@ export function createDemoData(today: string): PocketData {
   ];
   return {
     version: 1, mode: "weekly", budgets: { weekly: 250000, monthly: 500000 },
-    weekStartsOn: 1, fonts: { ...DEFAULT_FONTS }, isDemo: true,
+    weekStartsOn: 1, fonts: { ...DEFAULT_FONTS }, categories: [], isDemo: true,
     expenses: samples.map((sample, index) => ({ ...sample, id: `demo-${index}`, date: offsetDate(today, -Math.floor(index / 3)) })),
   };
 }
@@ -165,9 +166,11 @@ export function isPocketData(value: unknown): value is PocketData {
     && Number.isInteger(data.weekStartsOn) && data.weekStartsOn >= 0 && data.weekStartsOn <= 6
     && typeof data.isDemo === "boolean" && typeof data.fonts?.chosen === "boolean"
     && ["spotlight", "chai"].includes(data.fonts.body) && ["spotlight", "chai"].includes(data.fonts.numbers) && ["spotlight", "chai"].includes(data.fonts.title)
+    && Array.isArray(data.categories) && data.categories.length <= 30 && data.categories.every((category) => typeof category === "string" && category.trim().length > 0 && category.length <= 10)
+    && new Set(data.categories).size === data.categories.length
     && Array.isArray(data.expenses) && data.expenses.every((expense) =>
       expense !== null && typeof expense === "object" && typeof expense.id === "string" && validAmount(expense.amount)
-      && CATEGORIES.includes(expense.category) && isDateKey(expense.date)
+      && typeof expense.category === "string" && expense.category.trim().length > 0 && expense.category.length <= 10 && isDateKey(expense.date)
       && typeof expense.memo === "string" && expense.memo.length <= 80)
     && new Set(data.expenses.map((expense) => expense.id)).size === data.expenses.length;
 }
@@ -179,6 +182,6 @@ export function normalizePocketData(value: unknown): PocketData | null {
   if (!raw.fonts || typeof raw.fonts !== "object") return null;
   const fonts = raw.fonts as Record<string, unknown>;
   if (!["pretendard", "spotlight", "chai"].includes(String(fonts.body)) || !["pretendard", "spotlight", "chai"].includes(String(fonts.numbers))) return null;
-  const migrated = { ...raw, fonts: { ...DEFAULT_FONTS } };
+  const migrated = { ...raw, categories: Array.isArray(raw.categories) ? raw.categories : [], fonts: { ...DEFAULT_FONTS } };
   return isPocketData(migrated) ? migrated : null;
 }
