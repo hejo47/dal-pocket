@@ -1,4 +1,4 @@
-import { getPeriod, isDateKey, sumExpenses } from "./pocket.ts";
+import { getPeriod, isDateKey, offsetDate, sumExpenses } from "./pocket.ts";
 import type { PocketData, Period } from "./pocket.ts";
 
 export type MoneyEntry = { id: string; date: string; amount: number; memo: string };
@@ -52,6 +52,24 @@ export function allocatedBudget(data: PocketData, period: Period) {
   const days = monthDays(period.start.slice(0, 7));
   if (period.mode === "monthly") return total;
   return Math.floor(total * Number(period.end.slice(8)) / days) - Math.floor(total * (Number(period.start.slice(8)) - 1) / days);
+}
+export function foodBudgetSummary(data: PocketData, period: Period) {
+  const month = period.start.slice(0, 7);
+  const rate = monthSettings(data, month).groceries;
+  const finance = financeOf(data);
+  const food = data.expenses.filter((expense) => expense.category === "식비" || finance.payments[expense.id]?.groceries);
+  const allocation = (start: string, end: string) => Math.floor(rate * Number(end.slice(8)) / 7) - Math.floor(rate * (Number(start.slice(8)) - 1) / 7);
+  const base = allocation(period.start, period.end);
+  const previousSpent = sumExpenses(food.filter((expense) => expense.date >= month + "-01" && expense.date < period.start));
+  const previousAllocation = Math.floor(rate * (Number(period.start.slice(8)) - 1) / 7);
+  const carried = Math.max(0, previousSpent - previousAllocation);
+  const budget = Math.max(0, base - carried);
+  const spent = sumExpenses(food.filter((expense) => expense.date >= period.start && expense.date <= period.end));
+  const borrowed = Math.max(0, spent - budget);
+  const nextDate = offsetDate(period.end, 1);
+  const nextPeriod = nextDate.slice(0, 7) === month && period.mode === "weekly" ? getPeriod("weekly", data.weekStartsOn, nextDate) : null;
+  const nextBudget = nextPeriod ? Math.max(0, allocation(nextPeriod.start, nextPeriod.end) - Math.max(0, previousSpent + spent - previousAllocation - base)) : null;
+  return { configured: rate > 0, budget, spent, carried, borrowed, remaining: Math.max(0, budget - spent), nextBudget, nextPeriod };
 }
 export function financeSummary(data: PocketData, period: Period) {
   const month = period.start.slice(0, 7);

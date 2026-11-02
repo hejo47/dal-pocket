@@ -31,7 +31,7 @@ function BudgetForm({ month }: { month: string }) {
       <p className="font-numbers text-xl">{weekly ? "이 달 배정 합계" : "주별 편성 합계"} {formatMoney(monthlyTotal)}원</p>
     </div>
     <div className="flex flex-col gap-2">
-      <FieldLabel htmlFor="groceries">주 예산 중 자취 식료품 배정</FieldLabel>
+      <FieldLabel htmlFor="groceries">주 식비 배정 (식료품 포함)</FieldLabel>
       <TextField id="groceries" inputMode="numeric" value={groceries} onChange={(event) => setGroceries(event.target.value.replace(/\D/g, ""))} />
       <FieldHint>주 예산 안에서 배정합니다. 월간 설정에서는 주별 편성액에 반영됩니다.</FieldHint>
     </div>
