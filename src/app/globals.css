@@ -9,11 +9,13 @@
   --color-black-010: #e5e5e5;
   --color-black-005: #eeeeee;
   --color-black-002: #f6f6f6;
+  --color-red-2: #c62828;
   --container-page: 480px;
   --container-content: 432px;
   --container-modal: 450px;
   --spacing-modal-gutter: 15px;
   --spacing-select-arrow: 13px;
+  --text-calendar: 10px;
   --leading-130: 1.3;
   --leading-140: 1.4;
   --leading-150: 1.5;

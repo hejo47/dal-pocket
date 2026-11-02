@@ -1,20 +1,57 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createDemoData, getBudgetSummary, getCategoryTotals, getPeriod, getPeriodExpenses, isDateKey, isPocketData, normalizePocketData, offsetDate, sumExpenses, todayInSeoul } from "../src/lib/pocket.ts";
+import { createDemoData, getBudgetSummary, getCalendarMonth, getCategoryTotals, getPeriod, getPeriodBudget, getPeriodExpenses, isDateKey, isPocketData, normalizePocketData, offsetDate, sumExpenses, todayInSeoul } from "../src/lib/pocket.ts";
 import type { Expense } from "../src/lib/pocket.ts";
 import { isPocketWrite, isSameOriginWrite } from "../src/lib/pocket-api.ts";
 
-test("주간은 선택한 요일부터 정확히 7일이고 월·연도 경계를 넘을 수 있다", () => {
+test("주 시작 요일을 유지하고 매월 1일과 말일에서 주간 기간을 나눈다", () => {
   for (const [today, startDay, start, end] of [
     ["2026-11-02", 1, "2026-11-02", "2026-11-08"],
-    ["2026-11-01", 1, "2026-10-26", "2026-11-01"],
-    ["2027-01-01", 1, "2026-12-28", "2027-01-03"],
+    ["2026-11-01", 1, "2026-11-01", "2026-11-01"],
+    ["2027-01-01", 1, "2027-01-01", "2027-01-03"],
+    ["2026-12-31", 1, "2026-12-28", "2026-12-31"],
     ["2026-11-15", 0, "2026-11-15", "2026-11-21"],
   ] as const) {
     const period = getPeriod("weekly", startDay, today);
     assert.equal(period.start, start); assert.equal(period.end, end);
-    assert.equal(period.totalDays, 7); assert.equal(period.elapsedDays + period.remainingDays, 8);
+    assert.ok(period.totalDays >= 1 && period.totalDays <= 7);
+    assert.equal(period.elapsedDays + period.remainingDays, period.totalDays + 1);
+  }
+});
+
+test("월요일 시작·주 7만원일 때 첫 주 일요일 하루의 예산은 1만원이다", () => {
+  const first = getPeriod("weekly", 1, "2026-11-01");
+  assert.equal(first.weekNumber, 1);
+  const summary = getBudgetSummary(70000, [{ id: "one", date: "2026-11-01", amount: 3000, category: "식비", memo: "점심" }, { id: "before", date: "2026-10-31", amount: 90000, category: "식비", memo: "이전 달" }], first);
+  assert.equal(summary.budget, 10000);
+  assert.equal(summary.remaining, 7000);
+  assert.equal(summary.dailyAvailable, 7000);
+  assert.equal(summary.usedPercent, 30);
+  assert.equal(getPeriod("weekly", 1, "2026-11-02").weekNumber, 2);
+  assert.equal(getPeriodBudget(70000, getPeriod("weekly", 1, "2026-11-02")), 70000);
+  assert.equal(getPeriodBudget(70000, getPeriod("weekly", 1, "2026-11-30")), 10000);
+  assert.equal(getPeriodBudget(10000, first), 1428);
+  assert.equal(getPeriodBudget(70000, getPeriod("monthly", 1, "2026-11-01")), 70000);
+  assert.equal(Number.isFinite(getBudgetSummary(1, [], first).usedPercent), true);
+});
+
+test("달력은 모든 주 시작 요일과 윤년에서 각 날짜를 한 번씩 집계한다", () => {
+  for (const month of ["2026-11", "2028-02", "2026-12", "2027-01"]) {
+    for (let startDay = 0; startDay < 7; startDay++) {
+      const data = createDemoData(`${month}-15`);
+      const calendar = getCalendarMonth(month, startDay, data.expenses);
+      const days = calendar.weeks.flatMap((week) => week.days.filter((day) => day.inMonth));
+      assert.equal(days.length, calendar.period.totalDays);
+      assert.equal(new Set(days.map((day) => day.date)).size, days.length);
+      assert.equal(days[0].date, `${month}-01`);
+      assert.equal(days.at(-1)?.date, calendar.period.end);
+      assert.equal(calendar.weeks[0].period.weekNumber, 1);
+      assert.equal(calendar.weeks.reduce((sum, week) => sum + week.spent, 0), calendar.total);
+      assert.equal(calendar.total, sumExpenses(data.expenses));
+      assert.equal(calendar.weeks.reduce((sum, week) => sum + getPeriodBudget(70000, week.period), 0), days.length * 10000);
+      assert.equal(new Date(`${calendar.weeks[0].days[0].date}T00:00:00Z`).getUTCDay(), startDay);
+    }
   }
 });
 

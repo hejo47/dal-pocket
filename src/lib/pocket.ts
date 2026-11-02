@@ -52,18 +52,24 @@ export function getPeriod(mode: BudgetMode, weekStartsOn: number, today: string)
   }
   let start: string;
   let end: string;
+  const monthStart = `${today.slice(0, 7)}-01`;
+  const monthEnd = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+  const firstWeekOffset = (new Date(`${monthStart}T00:00:00Z`).getUTCDay() - weekStartsOn + 7) % 7;
   if (mode === "weekly") {
     const elapsed = (date.getUTCDay() - weekStartsOn + 7) % 7;
     start = offsetDate(today, -elapsed);
     end = offsetDate(start, 6);
+    start = start < monthStart ? monthStart : start;
+    end = end > monthEnd ? monthEnd : end;
   } else {
-    start = `${today.slice(0, 7)}-01`;
-    end = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+    start = monthStart;
+    end = monthEnd;
   }
   const startTime = new Date(`${start}T00:00:00Z`).getTime();
   const endTime = new Date(`${end}T00:00:00Z`).getTime();
   return {
-    start, end,
+    start, end, mode,
+    weekNumber: mode === "weekly" ? Math.floor((date.getUTCDate() - 1 + firstWeekOffset) / 7) + 1 : null,
     label: `${shortDate(start)}–${shortDate(end)}`,
     elapsedDays: Math.round((date.getTime() - startTime) / DAY) + 1,
     remainingDays: Math.round((endTime - date.getTime()) / DAY) + 1,
@@ -74,6 +80,31 @@ export function getPeriod(mode: BudgetMode, weekStartsOn: number, today: string)
 
 export type Period = ReturnType<typeof getPeriod>;
 
+export function getPeriodBudget(budget: number, period: Period) {
+  return period.mode === "weekly" ? Math.floor(budget * period.totalDays / 7) : budget;
+}
+
+export function getCalendarMonth(month: string, weekStartsOn: number, expenses: Expense[]) {
+  if (!/^\d{4}-\d{2}$/.test(month) || !isDateKey(`${month}-01`)) throw new Error("올바른 월이 필요합니다.");
+  const period = getPeriod("monthly", weekStartsOn, `${month}-01`);
+  const leadingDays = (new Date(`${period.start}T00:00:00Z`).getUTCDay() - weekStartsOn + 7) % 7;
+  const firstCell = offsetDate(period.start, -leadingDays);
+  const dayTotals = new Map<string, { amount: number; count: number }>();
+  for (const expense of getPeriodExpenses(expenses, period)) {
+    const current = dayTotals.get(expense.date) ?? { amount: 0, count: 0 };
+    dayTotals.set(expense.date, { amount: current.amount + expense.amount, count: current.count + 1 });
+  }
+  const weeks = Array.from({ length: Math.ceil((leadingDays + period.totalDays) / 7) }, (_, week) => {
+    const days = Array.from({ length: 7 }, (_, index) => {
+      const date = offsetDate(firstCell, week * 7 + index);
+      return { date, inMonth: date >= period.start && date <= period.end, ...dayTotals.get(date) ?? { amount: 0, count: 0 } };
+    });
+    const weekPeriod = getPeriod("weekly", weekStartsOn, days.find((day) => day.inMonth)!.date);
+    return { number: week + 1, days, period: weekPeriod, spent: days.reduce((sum, day) => sum + day.amount, 0) };
+  });
+  return { period, weeks, total: sumExpenses(getPeriodExpenses(expenses, period)), recordedDays: dayTotals.size };
+}
+
 export function getPeriodExpenses(expenses: Expense[], period: Pick<Period, "start" | "end">) {
   return expenses.filter((expense) => expense.date >= period.start && expense.date <= period.end)
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -83,12 +114,13 @@ export function sumExpenses(expenses: Expense[]) {
   return expenses.reduce((total, expense) => total + expense.amount, 0);
 }
 
-export function getBudgetSummary(budget: number, expenses: Expense[], period: Period) {
+export function getBudgetSummary(configuredBudget: number, expenses: Expense[], period: Period) {
+  const budget = getPeriodBudget(configuredBudget, period);
   const spent = sumExpenses(getPeriodExpenses(expenses, period));
   const remaining = budget - spent;
   return {
-    spent, remaining,
-    usedPercent: Math.round((spent / budget) * 100),
+    budget, spent, remaining,
+    usedPercent: budget ? Math.round((spent / budget) * 100) : spent ? 100 : 0,
     dailyAvailable: Math.max(0, Math.floor(remaining / period.remainingDays)),
     dailyAverage: Math.floor(spent / period.elapsedDays),
   };

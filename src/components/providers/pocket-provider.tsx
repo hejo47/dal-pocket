@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 
 import { getBudgetSummary, getPeriod, getPeriodExpenses, todayInSeoul } from "@/lib/pocket";
@@ -20,6 +20,7 @@ function usePocketController() {
   const summary = getBudgetSummary(data.budgets[data.mode], data.expenses, period);
   const [category, setCategory] = useState<Category | "전체">("전체");
   const [notice, setNotice] = useState<Notice>(null);
+  const dismissNotice = useCallback(() => setNotice(null), []);
   const [editor, setEditor] = useState<EditorState>({ open: false, expenseId: null, draft: emptyDraft("2000-01-01") });
   const returnFocus = useRef<HTMLElement | null>(null);
 
@@ -42,14 +43,14 @@ function usePocketController() {
     const persisted = updatePocket((current) => ({ ...current, budgets: { ...current.budgets, [current.mode]: amount }, weekStartsOn, isDemo: false, expenses: current.isDemo ? [] : current.expenses }));
     notify(data.isDemo ? "예산을 저장하고 내 기록을 시작했습니다." : "예산을 저장했습니다.", persisted);
   }
-  function openEditor(expense?: Expense) {
+  function openEditor(expense?: Expense, date = todayInSeoul()) {
     returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setEditor((current) => {
       const expenseId = expense?.id ?? null;
-      const reuse = current.expenseId === expenseId && current.draft.date !== "2000-01-01";
+      const reuse = current.expenseId === expenseId && current.draft.date !== "2000-01-01" && (expense !== undefined || current.draft.date === date);
       const draft = reuse ? current.draft : expense
         ? { amount: String(expense.amount), category: expense.category, date: expense.date, memo: expense.memo }
-        : emptyDraft(todayInSeoul());
+        : emptyDraft(date);
       return { open: true, expenseId, draft };
     });
   }
@@ -93,7 +94,7 @@ function usePocketController() {
   }
 
   return { data, today, ready, storage, retryCloud, loadServerCopy, period, expenses, summary, category, setCategory, setMode,
-    saveBudget, notice, dismissNotice: () => setNotice(null), editor, openEditor, closeEditor,
+    saveBudget, notice, dismissNotice, editor, openEditor, closeEditor,
     updateDraft, saveExpense, deleteExpense, restoreEditorFocus, startOwnRecords, saveFonts };
 }
 
