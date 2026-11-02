@@ -26,7 +26,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return <div className="mx-auto flex min-h-dvh w-full max-w-page flex-col border-x border-black-010 bg-white">
     <a href="#main-content" className="sr-only focus:not-sr-only focus:px-6 focus:py-3">본문 바로가기</a>
     <header className="flex flex-col gap-4 border-b border-black-010 px-6 pt-5 pb-4">
-      <div className="flex items-center justify-between gap-4"><Link href="/" className="font-pretendard tracking-pt text-base font-semibold leading-150">달주머니</Link></div>
+      <div className="flex items-center justify-between gap-4"><Link href="/" className="font-pretendard tracking-pt text-base font-semibold leading-150">달주머니</Link><Link href="/account" className="py-2 text-sm leading-150 text-black-030">계정</Link></div>
       <div className="flex gap-1 rounded-lg bg-black-002 p-1" aria-label="예산 관리 단위">{(["weekly", "monthly"] as const).map((mode) => <PillButton key={mode} variant={pocket.data.mode === mode ? "filled" : "ghost"} className="flex-1" aria-pressed={pocket.data.mode === mode} disabled={!pocket.ready} onClick={() => pocket.setMode(mode)}>{mode === "weekly" ? "주간" : "월간"}</PillButton>)}</div>
     </header>
     {pocket.ready && pocket.data.isDemo && <div className="flex flex-col gap-4 px-6 pt-4">

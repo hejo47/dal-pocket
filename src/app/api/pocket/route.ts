@@ -4,11 +4,19 @@ import type { NextRequest } from "next/server";
 
 import { isPocketWrite, isSameOriginWrite, MAX_BODY_BYTES } from "@/lib/pocket-api";
 import { PocketConflict, readPocket, writePocket } from "@/lib/server/pocket-repository";
+import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 
 const COOKIE = "dal-pocket-session";
 const headers = { "Cache-Control": "private, no-store" };
 
-function identity(request: NextRequest) {
+async function identity(request: NextRequest) {
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) {
+    try {
+      const supabase = await createSupabaseServerClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) return { secret: "", isNew: false, ownerId: createHash("sha256").update(`account:${user.id}`).digest("hex") };
+    } catch { /* Fall back to the existing private browser session if Auth is unavailable. */ }
+  }
   const stored = request.cookies.get(COOKIE)?.value;
   const secret = stored && /^[a-f0-9]{64}$/.test(stored) ? stored : randomBytes(32).toString("hex");
   return { secret, isNew: secret !== stored, ownerId: createHash("sha256").update(secret).digest("hex") };
@@ -25,7 +33,7 @@ function failure(error: unknown) {
 }
 
 export async function GET(request: NextRequest) {
-  const owner = identity(request);
+  const owner = await identity(request);
   if (!process.env.DATABASE_URL) return unavailable();
   try {
     const response = NextResponse.json(await readPocket(owner.ownerId), { headers });
@@ -37,7 +45,7 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   if (!isSameOriginWrite(request)) return NextResponse.json({ code: "INVALID_ORIGIN" }, { status: 403, headers });
   if (!process.env.DATABASE_URL) return unavailable();
-  const owner = identity(request);
+  const owner = await identity(request);
   if (owner.isNew) return NextResponse.json({ code: "SESSION_REQUIRED" }, { status: 401, headers });
   try {
     if (Number(request.headers.get("content-length")) > MAX_BODY_BYTES) return NextResponse.json({ code: "PAYLOAD_TOO_LARGE" }, { status: 413, headers });

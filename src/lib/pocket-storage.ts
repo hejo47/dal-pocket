@@ -21,6 +21,29 @@ const listeners = new Set<() => void>();
 
 export function getServerSnapshot() { return serverSnapshot; }
 
+export function getLocalData() { return getSnapshot().data; }
+
+export function adoptCloudPacket(packet: PocketPacket) {
+  cloudEnabled = true;
+  cloudRevision = packet.revision;
+  pending = null;
+  syncMeta = { revision: packet.revision, dirty: false };
+  snapshot = { ...getSnapshot(), data: packet.data ?? createDemoData(todayInSeoul()), storage: "synced" };
+  persist();
+  emit();
+}
+
+export function clearLocalPocket() {
+  const today = todayInSeoul();
+  pending = null;
+  cloudEnabled = false;
+  cloudRevision = null;
+  syncMeta = { revision: null, dirty: false };
+  snapshot = { data: createDemoData(today), today, ready: true, storage: "local" };
+  persist();
+  emit();
+}
+
 export function getSnapshot(): Snapshot {
   if (snapshot) return snapshot;
   const today = todayInSeoul();
