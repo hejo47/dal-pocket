@@ -17,6 +17,7 @@ model Pocket {
   monthlyBudget Int       @default(500000)
   weekStartsOn  Int       @default(1)
   categories    String[]  @default([])
+  categoryListVersion Int @default(0)
   bodyFont      String    @default("chai") @db.VarChar(9)
   numberFont    String    @default("chai") @db.VarChar(9)
   titleFont     String    @default("chai") @db.VarChar(9)

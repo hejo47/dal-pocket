@@ -10,7 +10,7 @@ import { getServerSnapshot, getSnapshot, loadServerCopy, retryCloud, subscribe, 
 export type ExpenseDraft = { amount: string; category: Category; date: string; memo: string };
 type EditorState = { open: boolean; expenseId: string | null; draft: ExpenseDraft };
 type Notice = { message: string; action?: { label: string; onClick: () => void } } | null;
-const emptyDraft = (today: string): ExpenseDraft => ({ amount: "", category: "식비", date: today, memo: "" });
+const emptyDraft = (today: string, category = CATEGORIES[0]): ExpenseDraft => ({ amount: "", category, date: today, memo: "" });
 
 function usePocketController() {
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
@@ -41,9 +41,23 @@ function usePocketController() {
   }
   function addCategory(value: string) {
     const name = value.trim();
-    if (!name || name.length > 10 || CATEGORIES.includes(name as (typeof CATEGORIES)[number]) || data.categories.includes(name) || data.categories.length >= 30) return false;
+    if (!name || name.length > 10 || data.categories.includes(name) || data.categories.length >= 30) return false;
     const persisted = updatePocket((current) => ({ ...current, categories: [...current.categories, name] }));
     notify("카테고리를 추가했습니다.", persisted);
+    return true;
+  }
+  function deleteCategory(name: string, replacement: string) {
+    if (data.categories.length <= 1 || !data.categories.includes(name)) return false;
+    const usesCategory = data.expenses.some((expense) => expense.category === name);
+    if (usesCategory && !data.categories.includes(replacement)) return false;
+    const affectedCount = data.expenses.filter((expense) => expense.category === name).length;
+    const persisted = updatePocket((current) => ({
+      ...current,
+      categories: current.categories.filter((category) => category !== name),
+      expenses: current.expenses.map((expense) => expense.category === name ? { ...expense, category: replacement } : expense),
+    }));
+    if (category === name) setCategory("전체");
+    notify(affectedCount ? `카테고리를 삭제하고 지출 ${affectedCount}건을 ‘${replacement}’으로 옮겼습니다.` : "카테고리를 삭제했습니다.", persisted);
     return true;
   }
   function saveBudget(amount: number, weekStartsOn: number) {
@@ -57,7 +71,7 @@ function usePocketController() {
       const reuse = current.expenseId === expenseId && current.draft.date !== "2000-01-01" && (expense !== undefined || current.draft.date === date);
       const draft = reuse ? current.draft : expense
         ? { amount: String(expense.amount), category: expense.category, date: expense.date, memo: expense.memo }
-        : emptyDraft(date);
+        : emptyDraft(date, data.categories[0] ?? CATEGORIES[0]);
       return { open: true, expenseId, draft };
     });
   }
@@ -77,14 +91,14 @@ function usePocketController() {
       if (expenseId) return { ...current, expenses: current.expenses.map((item) => item.id === expenseId ? expense : item) };
       return { ...current, isDemo: false, expenses: [expense, ...(current.isDemo ? [] : current.expenses)] };
     });
-    setEditor({ open: false, expenseId: null, draft: emptyDraft(today) });
+    setEditor({ open: false, expenseId: null, draft: emptyDraft(today, data.categories[0] ?? CATEGORIES[0]) });
     notify(expenseId ? "지출을 수정했습니다." : "지출을 기록했습니다.", persisted);
   }
   function deleteExpense() {
     const expense = data.expenses.find((item) => item.id === editor.expenseId);
     if (!expense) return;
     const persisted = updatePocket((current) => ({ ...current, expenses: current.expenses.filter((item) => item.id !== expense.id) }));
-    setEditor({ open: false, expenseId: null, draft: emptyDraft(today) });
+    setEditor({ open: false, expenseId: null, draft: emptyDraft(today, data.categories[0] ?? CATEGORIES[0]) });
     if (!persisted) { notify("지출을 삭제했습니다.", false); return; }
     setNotice({ message: "지출을 삭제했습니다.", action: { label: "되돌리기", onClick: () => {
       const restored = updatePocket((current) => ({ ...current, expenses: current.expenses.some((item) => item.id === expense.id) ? current.expenses : [...current.expenses, expense] }));
@@ -101,7 +115,7 @@ function usePocketController() {
   }
 
   return { data, today, ready, storage, retryCloud, loadServerCopy, period, expenses, summary, category, setCategory, setMode,
-    saveBudget, addCategory, notice, dismissNotice, editor, openEditor, closeEditor,
+    saveBudget, addCategory, deleteCategory, notice, dismissNotice, editor, openEditor, closeEditor,
     updateDraft, saveExpense, deleteExpense, restoreEditorFocus, startOwnRecords, saveFonts };
 }
 

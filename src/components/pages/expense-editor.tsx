@@ -8,7 +8,7 @@ import { ActionButtonRow } from "@/components/ui/action-button-row";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DateField, FieldError, FieldHint, FieldLabel, SelectField, TextField } from "@/components/ui/form-field";
 
-import { CATEGORIES, formatMoney, isDateKey, parseAmount, validAmount } from "@/lib/pocket";
+import { formatMoney, isDateKey, parseAmount, validAmount } from "@/lib/pocket";
 
 export function ExpenseEditor() {
   const pocket = usePocket();
@@ -32,7 +32,7 @@ export function ExpenseEditor() {
       <form id="expense-form" onSubmit={submit} className="flex min-h-0 flex-col gap-5">
         <div className="pocket-dialog-scroll flex min-h-0 flex-col gap-5 overflow-y-auto p-1">
           <div className="flex flex-col gap-2"><FieldLabel htmlFor="expense-amount" required>지출 금액</FieldLabel><div className="flex items-center gap-2 rounded-lg border border-black-010 px-3 py-3"><TextField id="expense-amount" required inputMode="numeric" autoComplete="off" placeholder="0" className="font-numbers border-0 px-0 py-0 text-3xl" value={editor.draft.amount ? formatMoney(parseAmount(editor.draft.amount)) : ""} onChange={(event) => { updateDraft({ amount: event.target.value.replace(/\D/g, "").slice(0, 9) }); setError(""); }} /><span className="text-sm text-black-030">원</span></div></div>
-          <div className="flex flex-col gap-2"><FieldLabel htmlFor="expense-category" required>카테고리</FieldLabel><SelectField id="expense-category" value={editor.draft.category} options={[...CATEGORIES, ...pocket.data.categories].map((category) => ({ value: category, label: category }))} onChange={(event) => updateDraft({ category: event.target.value })} /></div>
+          <div className="flex flex-col gap-2"><FieldLabel htmlFor="expense-category" required>카테고리</FieldLabel><SelectField id="expense-category" value={editor.draft.category} options={pocket.data.categories.map((category) => ({ value: category, label: category }))} onChange={(event) => updateDraft({ category: event.target.value })} /></div>
           <div className="flex flex-col gap-2"><FieldLabel htmlFor="expense-date" required>날짜</FieldLabel><DateField id="expense-date" required max={pocket.today} value={editor.draft.date} onChange={(event) => { updateDraft({ date: event.target.value }); setError(""); }} /></div>
           <div className="flex flex-col gap-2"><FieldLabel htmlFor="expense-memo">소비 내용 <span className="text-xs">선택</span></FieldLabel><TextField id="expense-memo" maxLength={80} placeholder="예: 친구와 점심" value={editor.draft.memo} onChange={(event) => updateDraft({ memo: event.target.value })} /></div>
           {pocket.data.isDemo && !editing && <FieldHint>첫 지출을 저장하면 예시 내역 대신 내 기록을 시작합니다.</FieldHint>}
