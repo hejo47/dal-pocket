@@ -63,13 +63,16 @@ export function foodBudgetSummary(data: PocketData, period: Period) {
   const previousSpent = sumExpenses(food.filter((expense) => expense.date >= month + "-01" && expense.date < period.start));
   const previousAllocation = Math.floor(rate * (Number(period.start.slice(8)) - 1) / 7);
   const carried = Math.max(0, previousSpent - previousAllocation);
-  const budget = Math.max(0, base - carried);
+  const carriedIn = Math.max(0, previousAllocation - previousSpent);
+  const budget = Math.max(0, base + carriedIn - carried);
   const spent = sumExpenses(food.filter((expense) => expense.date >= period.start && expense.date <= period.end));
   const borrowed = Math.max(0, spent - budget);
   const nextDate = offsetDate(period.end, 1);
   const nextPeriod = nextDate.slice(0, 7) === month && period.mode === "weekly" ? getPeriod("weekly", data.weekStartsOn, nextDate) : null;
-  const nextBudget = nextPeriod ? Math.max(0, allocation(nextPeriod.start, nextPeriod.end) - Math.max(0, previousSpent + spent - previousAllocation - base)) : null;
-  return { configured: rate > 0, budget, spent, carried, borrowed, remaining: Math.max(0, budget - spent), nextBudget, nextPeriod };
+  const nextBase = nextPeriod ? allocation(nextPeriod.start, nextPeriod.end) : null;
+  const nextAdjustment = previousAllocation + base - previousSpent - spent;
+  const nextBudget = nextBase !== null ? Math.max(0, nextBase + nextAdjustment) : null;
+  return { configured: rate > 0, base, carriedIn, nextBase, nextAdjustment, budget, spent, carried, borrowed, remaining: Math.max(0, budget - spent), nextBudget, nextPeriod };
 }
 export function financeSummary(data: PocketData, period: Period) {
   const month = period.start.slice(0, 7);
@@ -83,13 +86,14 @@ export function financeSummary(data: PocketData, period: Period) {
     priorDebt = Math.max(0, priorDebt + spentBefore + fixedTotal(data, previousMonth + "-01", getPeriod("monthly", 1, previousMonth + "-01").end, true) - setting.budget);
   }
   const carried = period.mode === "weekly" ? Math.max(0, priorDebt + priorSpent + priorFixed - priorAllocation) : priorDebt;
-  const budget = Math.max(0, allocatedBudget(data, period) - carried);
+  const carriedIn = period.mode === "weekly" ? Math.max(0, priorAllocation - priorDebt - priorSpent - priorFixed) : 0;
+  const budget = Math.max(0, allocatedBudget(data, period) + carriedIn - carried);
   const regularSpent = sumExpenses(data.expenses.filter((expense) => expense.date >= period.start && expense.date <= period.end));
   const fixedSpent = fixedTotal(data, period.start, period.end);
   const spent = regularSpent + fixedTotal(data, period.start, period.end, true);
   const remaining = budget - spent;
   const reserved = financeOf(data).plans.filter((plan) => plan.date >= period.start && plan.date <= period.end).reduce((sum, plan) => sum + plan.amount, 0);
-  return { regularSpent, fixedSpent, budget, spent, remaining, carried, reserved, usedPercent: budget ? Math.round(spent / budget * 100) : spent ? 100 : 0, dailyAvailable: Math.max(0, Math.floor((remaining - reserved) / period.remainingDays)), dailyAverage: Math.floor(spent / period.elapsedDays) };
+  return { carriedIn, regularSpent, fixedSpent, budget, spent, remaining, carried, reserved, usedPercent: budget ? Math.round(spent / budget * 100) : spent ? 100 : 0, dailyAvailable: Math.max(0, Math.floor((remaining - reserved) / period.remainingDays)), dailyAverage: Math.floor(spent / period.elapsedDays) };
 }
 export function nextMonth(month: string, offset = 1) { return new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)) - 1 + offset, 1)).toISOString().slice(0, 7); }
 export function installmentDue(item: Installment, month: string) {
