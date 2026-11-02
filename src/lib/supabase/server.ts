@@ -1,9 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { supabaseUrl, supabasePublishableKey } from "./config";
 
 export async function createClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const url = supabaseUrl;
+  const key = supabasePublishableKey;
   if (!url || !key) throw new Error("SUPABASE_AUTH_NOT_CONFIGURED");
   const cookieStore = await cookies();
   return createServerClient(url, key, {
