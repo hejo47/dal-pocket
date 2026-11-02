@@ -1,3 +1,4 @@
+import { emptyFinance, isFinance } from "./finance.ts";
 export const CATEGORIES = ["식비", "카페", "교통", "쇼핑", "여가", "기타"] as const;
 export const WEEKDAYS = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"] as const;
 export const FONT_NAMES = { spotlight: "Y 너만을 비춤체", chai: "차이 상승체" } as const;
@@ -9,6 +10,7 @@ export type Expense = { id: string; amount: number; category: Category; date: st
 export type FontPreferences = { body: FontChoice; numbers: FontChoice; title: FontChoice; chosen: boolean };
 export const DEFAULT_FONTS: FontPreferences = { body: "chai", numbers: "chai", title: "chai", chosen: true };
 export type PocketData = {
+  finance?: import("./finance").Finance;
   version: 2;
   mode: BudgetMode;
   budgets: Record<BudgetMode, number>;
@@ -153,6 +155,7 @@ export function createDemoData(today: string): PocketData {
   ];
   return {
     version: 2, mode: "weekly", budgets: { weekly: 250000, monthly: 500000 },
+    finance: { ...emptyFinance(), months: { [today.slice(0,7)]: { budget: 500000, groceries: 0 } } },
     weekStartsOn: 1, fonts: { ...DEFAULT_FONTS }, categories: [...CATEGORIES], isDemo: true,
     expenses: samples.map((sample, index) => ({ ...sample, id: `demo-${index}`, date: offsetDate(today, -Math.floor(index / 3)) })),
   };
@@ -161,7 +164,7 @@ export function createDemoData(today: string): PocketData {
 export function isPocketData(value: unknown): value is PocketData {
   if (!value || typeof value !== "object") return false;
   const data = value as PocketData;
-  return data.version === 2 && ["weekly", "monthly"].includes(data.mode)
+  return (data.finance === undefined || isFinance(data.finance)) && data.version === 2 && ["weekly", "monthly"].includes(data.mode)
     && validAmount(data.budgets?.weekly) && validAmount(data.budgets?.monthly)
     && Number.isInteger(data.weekStartsOn) && data.weekStartsOn >= 0 && data.weekStartsOn <= 6
     && typeof data.isDemo === "boolean" && typeof data.fonts?.chosen === "boolean"
@@ -176,15 +179,18 @@ export function isPocketData(value: unknown): value is PocketData {
 }
 
 export function normalizePocketData(value: unknown): PocketData | null {
-  if (isPocketData(value)) return value.fonts.chosen ? value : { ...value, fonts: { ...DEFAULT_FONTS } };
+  if (isPocketData(value)) {
+    const finance = value.finance ?? { ...emptyFinance(), months: { [todayInSeoul().slice(0,7)]: { budget: value.budgets.monthly, groceries: 0 } } };
+    return { ...value, finance, fonts: value.fonts.chosen ? value.fonts : { ...DEFAULT_FONTS } };
+  }
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
-  if (raw.version !== 1 || !raw.fonts || typeof raw.fonts !== "object") return null;
+  if ((raw.version !== 1 && raw.version !== 2) || !raw.fonts || typeof raw.fonts !== "object") return null;
   const fonts = raw.fonts as Record<string, unknown>;
   if (!["pretendard", "spotlight", "chai"].includes(String(fonts.body)) || !["pretendard", "spotlight", "chai"].includes(String(fonts.numbers))) return null;
   const rawExpenses = Array.isArray(raw.expenses) ? raw.expenses.flatMap((expense) => expense && typeof expense === "object" && "category" in expense && typeof expense.category === "string" ? [expense.category] : []) : [];
   const oldCategories = Array.isArray(raw.categories) ? raw.categories.filter((category): category is string => typeof category === "string") : [];
-  const categories = [...new Set([...CATEGORIES, ...oldCategories, ...rawExpenses])];
-  const migrated = { ...raw, version: 2, categories, fonts: { ...DEFAULT_FONTS } };
+  const categories = raw.version === 2 && oldCategories.length ? oldCategories : [...new Set([...CATEGORIES, ...oldCategories, ...rawExpenses])];
+  const migrated = { ...raw, version: 2, categories, finance: raw.finance ?? { ...emptyFinance(), months: { [todayInSeoul().slice(0,7)]: { budget: (raw.budgets as {monthly?: number})?.monthly ?? 500000, groceries: 0 } } }, fonts: { ...DEFAULT_FONTS } };
   return isPocketData(migrated) ? migrated : null;
 }

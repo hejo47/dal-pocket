@@ -6,6 +6,7 @@ import { ExpenseList } from "@/components/pages/expense-list";
 import { usePocket } from "@/components/providers/pocket-provider";
 import { PageSkeleton, ScreenTitle } from "@/components/ui/screen-title";
 
+import { financeOf, monthSettings } from "@/lib/finance";
 import { formatMoney, shortDate, sumExpenses } from "@/lib/pocket";
 
 export function HomePage() {
@@ -15,6 +16,7 @@ export function HomePage() {
   const todaysExpenses = pocket.expenses.filter((expense) => expense.date === today);
   return <div className="flex w-full max-w-content flex-col gap-7">
     <ScreenTitle title={data.mode === "weekly" ? `${Number(today.slice(5, 7))}월 ${period.weekNumber}주 예산` : `${Number(today.slice(5, 7))}월 예산`} subtitle={`${shortDate(today)} 기준`} action={<Link href="/budget" className="py-2 text-xs leading-150 underline underline-offset-4">예산 수정</Link>} />
+    <div className="flex flex-col gap-2 rounded-xl border border-black-010 bg-black-002 p-4 text-sm"><p>이전 주 초과 지출 차감: {formatMoney(summary.carried)}원</p><p>이번 기간 약속 확보액: {formatMoney(summary.reserved)}원</p><p>식료품 배정액: {formatMoney(Math.floor(monthSettings(data,today.slice(0,7)).groceries * period.totalDays / 7))}원 · 사용 {formatMoney(pocket.expenses.filter((expense) => financeOf(data).payments[expense.id]?.groceries).reduce((sum,expense)=>sum+expense.amount,0))}원 (전체 예산에 포함)</p><Link href="/finance" className="self-start rounded-lg border border-black-100 bg-white px-3 py-2">수입·할부·약속·현금 잔액 관리 →</Link></div>
     <section aria-label="예산 현황" className="flex flex-col gap-5 border-b border-black-010 pb-6">
       <div className="flex flex-col gap-1"><p className="text-sm leading-150 text-black-030">{summary.remaining < 0 ? "예산 초과 금액" : "남은 예산"}</p><p className="font-numbers break-all text-4xl leading-130">{formatMoney(Math.abs(summary.remaining))}<span className="text-xl">원</span></p></div>
       <div className="flex flex-col gap-2"><div role="progressbar" aria-label="예산 사용률" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, summary.usedPercent)} aria-valuetext={`${summary.usedPercent}% 사용`} className="flex h-1.5 overflow-hidden rounded-full bg-black-002"><span className="bg-black-100 transition-all" style={{ width: `${Math.min(100, summary.usedPercent)}%` }} /></div><div className="flex items-center justify-between gap-3 text-xs leading-150 text-black-030"><span>예산의 {summary.usedPercent}% 사용</span><span>{period.label}</span></div></div>

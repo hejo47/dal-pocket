@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { isPocketData, todayInSeoul } from "@/lib/pocket";
+import { financeOf } from "@/lib/finance";
 import type { PocketData } from "@/lib/pocket";
 import { isSameOriginWrite, MAX_BODY_BYTES } from "@/lib/pocket-api";
 import { deletePocket, PocketConflict, readPocket, writePocket } from "@/lib/server/pocket-repository";
@@ -36,8 +37,17 @@ export async function POST(request: NextRequest) {
     const base = account.data ?? sources[0]!;
     const expenses = new Map<string, (typeof base.expenses)[number]>();
     for (const source of sources) for (const expense of source.expenses) expenses.set(expense.id, expense);
+    const financialSources = sources.map(financeOf);
+    const finance = { ...financeOf(base) };
+    finance.months = Object.assign({}, ...financialSources.slice().reverse().map((item) => item.months));
+    finance.payments = Object.assign({}, ...financialSources.map((item) => item.payments));
+    for (const type of ["incomes", "plans", "installments"] as const) {
+      const entries = new Map(financialSources.flatMap((item) => item[type]).map((item) => [item.id, item]));
+      if (type === "installments") finance.installments = [...entries.values()].filter((item): item is import("@/lib/finance").Installment => "months" in item);
+      else finance[type] = [...entries.values()];
+    }
     const merged = {
-      ...base,
+      ...base, finance,
       categories: [...new Set(sources.flatMap((source) => source.categories))].slice(0, 30),
       expenses: [...expenses.values()].sort((a, b) => b.date.localeCompare(a.date)),
       isDemo: false,

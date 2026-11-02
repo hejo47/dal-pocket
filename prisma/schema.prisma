@@ -18,6 +18,7 @@ model Pocket {
   weekStartsOn  Int       @default(1)
   categories    String[]  @default([])
   categoryListVersion Int @default(0)
+  financialData Json @default("{}")
   bodyFont      String    @default("chai") @db.VarChar(9)
   numberFont    String    @default("chai") @db.VarChar(9)
   titleFont     String    @default("chai") @db.VarChar(9)

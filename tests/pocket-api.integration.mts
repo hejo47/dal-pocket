@@ -19,6 +19,7 @@ test("Prisma API: 기록 저장·수정·삭제, 예산, 충돌 검사와 브라
   const write = (data: unknown, revision: number, requestOrigin = origin) => fetch(endpoint, { method: "PUT", headers: { Cookie: cookie, Origin: requestOrigin, "Content-Type": "application/json" }, body: JSON.stringify({ data, revision }) });
   const data = {
     ...createDemoData(todayInSeoul()), isDemo: false, budgets: { weekly: 180000, monthly: 600000 }, weekStartsOn: 0,
+    finance: { ...createDemoData(todayInSeoul()).finance!, incomes: [{ id: "income-test", date: todayInSeoul(), amount: 100000, memo: "수입 저장 검증" }], payments: { "api-integration-expense": { gross: 18000, split: 2, method: "card" as const, settled: false, settledDate: todayInSeoul(), note: "정산 메모 저장 검증" } } },
     expenses: [{ id: "api-integration-expense", date: todayInSeoul(), category: "식비", amount: 9000, memo: "통합 검증용 점심" }],
   };
   const saved = await write(data, 0);

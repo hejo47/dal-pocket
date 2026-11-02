@@ -28,7 +28,7 @@ export function PocketToasts() {
         action: { label: storage === "error" ? "다시 저장" : "서버 기록 불러오기", onClick: () => { void (storage === "error" ? retryCloud() : loadServerCopy()); } },
       });
     } else if (storage === "synced" && previous !== null) {
-      toast.success(data.isDemo ? "서버 연결됨" : "서버 저장 완료", { id: STORAGE_TOAST, duration: 3000 });
+      toast.dismiss(STORAGE_TOAST);
     } else if (storage === "local") {
       toast.dismiss(STORAGE_TOAST);
     } else if (storage === "connecting" && (previous === "error" || previous === "conflict")) {

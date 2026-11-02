@@ -3,21 +3,23 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 
-import { CATEGORIES, getBudgetSummary, getPeriod, getPeriodExpenses, todayInSeoul } from "@/lib/pocket";
+import { CATEGORIES, getPeriod, getPeriodExpenses, todayInSeoul } from "@/lib/pocket";
+import { financeOf, financeSummary } from "@/lib/finance";
+import type { Finance, Payment } from "@/lib/finance";
 import type { BudgetMode, Category, Expense, FontPreferences } from "@/lib/pocket";
 import { getServerSnapshot, getSnapshot, loadServerCopy, retryCloud, subscribe, updatePocket } from "@/lib/pocket-storage";
 
-export type ExpenseDraft = { amount: string; category: Category; date: string; memo: string };
+export type ExpenseDraft = { amount: string; category: Category; date: string; memo: string; payment?: Payment };
 type EditorState = { open: boolean; expenseId: string | null; draft: ExpenseDraft };
 type Notice = { message: string; action?: { label: string; onClick: () => void } } | null;
-const emptyDraft = (today: string, category = CATEGORIES[0]): ExpenseDraft => ({ amount: "", category, date: today, memo: "" });
+const emptyDraft = (today: string, category: string = CATEGORIES[0]): ExpenseDraft => ({ amount: "", category, date: today, memo: "" });
 
 function usePocketController() {
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const { data, today, ready, storage } = snapshot;
   const period = getPeriod(data.mode, data.weekStartsOn, today);
   const expenses = getPeriodExpenses(data.expenses, period);
-  const summary = getBudgetSummary(data.budgets[data.mode], data.expenses, period);
+  const summary = financeSummary(data, period);
   const [category, setCategory] = useState<Category | "전체">("전체");
   const [notice, setNotice] = useState<Notice>(null);
   const dismissNotice = useCallback(() => setNotice(null), []);
@@ -38,6 +40,17 @@ function usePocketController() {
   }
   function setMode(mode: BudgetMode) {
     updatePocket((current) => ({ ...current, mode }));
+  }
+  function saveFinance(finance: Finance) {
+    const persisted = updatePocket((current) => ({ ...current, finance, isDemo: false, expenses: current.isDemo ? [] : current.expenses }));
+    notify("저장했습니다.", persisted);
+  }
+  function saveMonthlyBudget(month: string, budget: number, groceries: number, weekStartsOn: number) {
+    const persisted = updatePocket((current) => {
+      const finance = financeOf(current);
+      return { ...current, finance: { ...finance, months: { ...finance.months, [month]: { budget, groceries } } }, weekStartsOn, isDemo: false, expenses: current.isDemo ? [] : current.expenses };
+    });
+    notify(`${month} 예산을 저장했습니다.`, persisted);
   }
   function addCategory(value: string) {
     const name = value.trim();
@@ -68,9 +81,9 @@ function usePocketController() {
     returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setEditor((current) => {
       const expenseId = expense?.id ?? null;
-      const reuse = current.expenseId === expenseId && current.draft.date !== "2000-01-01" && (expense !== undefined || current.draft.date === date);
+      const reuse = expense === undefined && data.categories.includes(current.draft.category) && current.expenseId === expenseId && current.draft.date !== "2000-01-01" && (expense !== undefined || current.draft.date === date);
       const draft = reuse ? current.draft : expense
-        ? { amount: String(expense.amount), category: expense.category, date: expense.date, memo: expense.memo }
+        ? { amount: String(financeOf(data).payments[expense.id]?.gross ?? expense.amount), payment: financeOf(data).payments[expense.id], category: expense.category, date: expense.date, memo: expense.memo }
         : emptyDraft(date, data.categories[0] ?? CATEGORIES[0]);
       return { open: true, expenseId, draft };
     });
@@ -86,10 +99,13 @@ function usePocketController() {
   }
   function saveExpense(amount: number) {
     const { expenseId, draft } = editor;
-    const expense: Expense = { id: expenseId ?? crypto.randomUUID(), amount, category: draft.category, date: draft.date, memo: draft.memo.trim() };
+    const expense: Expense = { id: expenseId ?? crypto.randomUUID(), amount: Math.ceil(amount / (draft.payment?.split ?? 1)), category: draft.category, date: draft.date, memo: draft.memo.trim() };
     const persisted = updatePocket((current) => {
-      if (expenseId) return { ...current, expenses: current.expenses.map((item) => item.id === expenseId ? expense : item) };
-      return { ...current, isDemo: false, expenses: [expense, ...(current.isDemo ? [] : current.expenses)] };
+      const finance = financeOf(current);
+      finance.payments = { ...finance.payments, [expense.id]: { gross: amount, split: 1, method: "cash", settled: false, settledDate: today, ...draft.payment } };
+      finance.payments[expense.id].gross = amount;
+      if (expenseId) return { ...current, finance, expenses: current.expenses.map((item) => item.id === expenseId ? expense : item) };
+      return { ...current, finance, isDemo: false, expenses: [expense, ...(current.isDemo ? [] : current.expenses)] };
     });
     setEditor({ open: false, expenseId: null, draft: emptyDraft(today, data.categories[0] ?? CATEGORIES[0]) });
     notify(expenseId ? "지출을 수정했습니다." : "지출을 기록했습니다.", persisted);
@@ -115,7 +131,7 @@ function usePocketController() {
   }
 
   return { data, today, ready, storage, retryCloud, loadServerCopy, period, expenses, summary, category, setCategory, setMode,
-    saveBudget, addCategory, deleteCategory, notice, dismissNotice, editor, openEditor, closeEditor,
+    saveBudget, saveMonthlyBudget, saveFinance, addCategory, deleteCategory, notice, dismissNotice, editor, openEditor, closeEditor,
     updateDraft, saveExpense, deleteExpense, restoreEditorFocus, startOwnRecords, saveFonts };
 }
 

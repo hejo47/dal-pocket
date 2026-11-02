@@ -17,7 +17,7 @@ import { formatMoney, getPeriod, getPeriodExpenses, offsetDate, sumExpenses } fr
 
 export function ExpensesPage() {
   const pocket = usePocket();
-  const [weekOffset, setWeekOffset] = useState(0);
+  const [viewDate, setViewDate] = useState<string | null>(null);
   const [addingCategory, setAddingCategory] = useState(false);
   const [categoryName, setCategoryName] = useState("");
   const [categoryError, setCategoryError] = useState("");
@@ -26,8 +26,8 @@ export function ExpensesPage() {
   const [replacementCategory, setReplacementCategory] = useState("");
   if (!pocket.ready) return <PageSkeleton />;
   const period = pocket.data.mode === "weekly"
-    ? getPeriod("weekly", pocket.data.weekStartsOn, offsetDate(pocket.today, weekOffset * 7))
-    : pocket.period;
+    ? getPeriod("weekly", pocket.data.weekStartsOn, viewDate ?? pocket.today)
+    : getPeriod("monthly", pocket.data.weekStartsOn, viewDate ?? pocket.today);
   const periodExpenses = pocket.data.mode === "weekly" ? getPeriodExpenses(pocket.data.expenses, period) : pocket.expenses;
   const filtered = periodExpenses.filter((expense) => pocket.category === "전체" || expense.category === pocket.category);
   function submitCategory(event: FormEvent<HTMLFormElement>) {
@@ -41,7 +41,8 @@ export function ExpensesPage() {
   }
   return <div className="flex w-full max-w-content flex-col gap-6">
     <ScreenTitle title="지출 내역" subtitle={pocket.data.mode === "weekly" ? "주별로 기록을 확인할 수 있어요" : `${period.label} · ${period.scope}`} />
-    {pocket.data.mode === "weekly" && <div className="flex items-center justify-between rounded-lg border border-black-010 px-3 py-2"><PillButton aria-label="이전 주" variant="ghost" size="icon" onClick={() => setWeekOffset((offset) => offset - 1)}><IconContainer size="slg"><ChevronLeft /></IconContainer></PillButton><span className="text-sm leading-150">{period.weekNumber}주차 · {period.label}</span><PillButton aria-label="다음 주" variant="ghost" size="icon" disabled={weekOffset >= 0} onClick={() => setWeekOffset((offset) => Math.min(0, offset + 1))}><IconContainer size="slg"><ChevronRight /></IconContainer></PillButton></div>}
+    <div className="flex flex-col gap-2"><FieldLabel htmlFor="view-date">조회할 날짜</FieldLabel><TextField id="view-date" type="date" max={pocket.today} value={viewDate ?? pocket.today} onChange={(event) => { if (event.target.value) setViewDate(event.target.value); }} /></div>
+    {pocket.data.mode === "weekly" && <div className="flex items-center justify-between rounded-lg border border-black-010 px-3 py-2"><PillButton aria-label="이전 주" variant="ghost" size="icon" onClick={() => setViewDate(offsetDate(period.start, -1))}><IconContainer size="slg"><ChevronLeft /></IconContainer></PillButton><span className="text-sm leading-150">{period.start.slice(0, 7)} · {period.weekNumber}주차 · {period.label}</span><PillButton aria-label="다음 주" variant="ghost" size="icon" disabled={period.end >= pocket.today} onClick={() => setViewDate(offsetDate(period.end, 1))}><IconContainer size="slg"><ChevronRight /></IconContainer></PillButton></div>}
     <div className="flex items-center justify-between gap-3"><span className="text-sm leading-150 text-black-030">{pocket.category === "전체" ? "전체 지출" : `${pocket.category} 지출`}</span><p className="font-numbers text-2xl leading-140">{formatMoney(sumExpenses(filtered))}원</p></div>
     <section className="flex flex-col gap-3" aria-label="카테고리"><div className="flex items-center justify-between gap-2"><h2 className="text-sm leading-150">카테고리</h2><PillButton type="button" variant="ghost" size="sm" aria-pressed={managingCategories} onClick={() => setManagingCategories((value) => !value)}>{managingCategories ? "완료" : "편집"}</PillButton></div><div className="flex flex-wrap gap-2" aria-label="카테고리 필터"><PillButton variant={pocket.category === "전체" ? "filled" : "outline"} size="sm" aria-pressed={pocket.category === "전체"} onClick={() => pocket.setCategory("전체")}>전체</PillButton>{pocket.data.categories.map((category) => <div key={category} className="flex items-center gap-1"><PillButton variant={pocket.category === category ? "filled" : "outline"} size="sm" aria-pressed={pocket.category === category} onClick={() => pocket.setCategory(category)}>{category}</PillButton>{managingCategories && <PillButton type="button" variant="ghost" size="icon" className="rounded-full px-2 py-2" aria-label={`${category} 삭제`} disabled={pocket.data.categories.length <= 1} onClick={() => { setCategoryToDelete(category); setReplacementCategory(pocket.data.categories.find((item) => item !== category) ?? ""); }}><IconContainer size="sm"><X /></IconContainer></PillButton>}</div>)}<PillButton type="button" variant="ghost" size="sm" disabled={pocket.data.categories.length >= 30} onClick={() => { setAddingCategory((value) => !value); setCategoryError(""); }}>＋ 추가</PillButton></div>
       {addingCategory && <form onSubmit={submitCategory} className="flex flex-col gap-2"><div className="flex gap-2"><TextField autoFocus aria-label="새 카테고리 이름" maxLength={10} placeholder="새 카테고리 이름" value={categoryName} onChange={(event) => { setCategoryName(event.target.value); setCategoryError(""); }} /><PillButton type="submit" size="sm">추가</PillButton></div>{categoryError && <p role="alert" className="text-xs leading-150 text-black-030">{categoryError}</p>}</form>}
