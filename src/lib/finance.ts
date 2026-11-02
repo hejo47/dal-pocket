@@ -2,6 +2,7 @@ import { getPeriod, isDateKey, offsetDate, sumExpenses } from "./pocket.ts";
 import type { PocketData, Period } from "./pocket.ts";
 
 export type MoneyEntry = { id: string; date: string; amount: number; memo: string };
+export type SavingsEntry = MoneyEntry & { direction: "deposit" | "withdraw" };
 export type Installment = MoneyEntry & { months: number };
 export type FixedExpense = MoneyEntry & { endMonth?: string; includeInBudget?: boolean; method?: "cash" | "card"; cadence?: "monthly" | "sessions"; sessionsPerPayment?: number; sessionDates?: string[]; paymentDates?: string[] };
 export type Payment = { gross: number; split: number; method: "cash" | "card"; settled: boolean; settledDate: string; note?: string; groceries?: boolean };
@@ -11,6 +12,7 @@ export type Finance = {
   incomes: MoneyEntry[]; plans: MoneyEntry[]; installments: Installment[];
   payments: Record<string, Payment>;
   fixedExpenses?: FixedExpense[];
+  savings?: SavingsEntry[];
 };
 export const emptyFinance = (): Finance => ({ months: {}, openingBalance: 0, openingDate: "2000-01-01", billingDay: 15, incomes: [], plans: [], installments: [], payments: {} });
 export function isFinance(value: unknown): value is Finance {
@@ -22,6 +24,7 @@ export function isFinance(value: unknown): value is Finance {
     && !!data.months && typeof data.months === "object" && Object.entries(data.months).every(([month, setting]) => /^\d{4}-\d{2}$/.test(month) && isDateKey(`${month}-01`) && setting && amount(setting.budget) && amount(setting.groceries))
     && Array.isArray(data.incomes) && data.incomes.length <= 10000 && data.incomes.every(entry)
     && Array.isArray(data.plans) && data.plans.length <= 10000 && data.plans.every(entry)
+    && (data.savings === undefined || Array.isArray(data.savings) && data.savings.length <= 10000 && data.savings.every((item) => entry(item) && ["deposit", "withdraw"].includes(item.direction)))
     && Array.isArray(data.installments) && data.installments.length <= 1000 && data.installments.every((item) => entry(item) && Number.isInteger(item.months) && item.months >= 2 && item.months <= 60)
     && (data.fixedExpenses === undefined || Array.isArray(data.fixedExpenses) && data.fixedExpenses.length <= 1000 && data.fixedExpenses.every((item) => entry(item) && (item.method === undefined || ["cash", "card"].includes(item.method)) && (item.cadence === undefined || ["monthly", "sessions"].includes(item.cadence)) && (item.cadence !== "sessions" || Number.isInteger(item.sessionsPerPayment) && item.sessionsPerPayment! >= 1 && item.sessionsPerPayment! <= 100 && Array.isArray(item.sessionDates) && item.sessionDates.length <= 10000 && item.sessionDates.every((date) => isDateKey(date) && date >= item.date) && Array.isArray(item.paymentDates) && item.paymentDates.length >= 1 && item.paymentDates.length <= 10000 && item.paymentDates.every((date) => isDateKey(date) && date >= item.date)) && (item.includeInBudget === undefined || typeof item.includeInBudget === "boolean") && (!item.endMonth || isDateKey(item.endMonth + "-01") && item.endMonth >= item.date.slice(0, 7))))
     && !!data.payments && typeof data.payments === "object" && Object.values(data.payments).every((item) => item && amount(item.gross) && Number.isInteger(item.split) && item.split >= 1 && item.split <= 100 && ["cash", "card"].includes(item.method) && (item.groceries === undefined || typeof item.groceries === "boolean") && typeof item.settled === "boolean" && isDateKey(item.settledDate) && (item.note === undefined || typeof item.note === "string" && item.note.length <= 200));
@@ -161,7 +164,12 @@ export function cashFlow(data: PocketData, month: string) {
   const fixedCashOut = fixedTotal(data, finance.openingDate, end, false, "cash");
   const fixedOut = fixedCashOut + fixedCardOut;
   const livingRemaining = monthSettings(data, month).budget - monthSpent - planned - fixedTotal(data, month + "-01", end, true);
-  const balance = finance.openingBalance + income + received - cashOut - cardOut - installments - fixedCashOut;
+  const savings = finance.savings ?? [];
+  const savedMonth = savings.filter((item) => item.date.slice(0,7) === month && item.direction === "deposit").reduce((sum,item) => sum + item.amount, 0);
+  const withdrawnMonth = savings.filter((item) => item.date.slice(0,7) === month && item.direction === "withdraw").reduce((sum,item) => sum + item.amount, 0);
+  const savingsBalance = savings.filter((item) => item.date <= end).reduce((sum,item) => sum + (item.direction === "deposit" ? item.amount : -item.amount), 0);
+  const savingsTransfer = savings.filter((item) => inRange(item.date)).reduce((sum,item) => sum + (item.direction === "deposit" ? item.amount : -item.amount), 0);
+  const balance = finance.openingBalance + income + received - cashOut - cardOut - installments - fixedCashOut - savingsTransfer;
   const availableBalance = balance - futureCard - installmentOutstanding - planned;
-  return { fixedCashOut, fixedCardOut, fixedMonth, fixedOut, monthSpent, availableBalance, installmentOutstanding, futureCard, balance, income, cashOut, cardOut, received, receivable, installmentMonth, dueThisMonth, planned, recommendedLimit: Math.max(0, Math.min(livingRemaining, availableBalance)) };
+  return { savedMonth, withdrawnMonth, savingsBalance, savingsTransfer, fixedCashOut, fixedCardOut, fixedMonth, fixedOut, monthSpent, availableBalance, installmentOutstanding, futureCard, balance, income, cashOut, cardOut, received, receivable, installmentMonth, dueThisMonth, planned, recommendedLimit: Math.max(0, Math.min(livingRemaining, availableBalance)) };
 }
