@@ -23,6 +23,7 @@ export function HomePage() {
   const selectedDate = viewDate ?? today;
   const period = getPeriod(data.mode, data.weekStartsOn, selectedDate);
   const summary = financeSummary(data, period);
+  const dailyBudget = Math.max(0, Math.floor(summary.remaining / period.remainingDays));
   const periodExpenses = getPeriodExpenses(data.expenses, period);
   const periodLabel = `${Number(period.start.slice(5, 7))}월 ${period.weekNumber}주`;
   return <div className="flex w-full max-w-content flex-col gap-7">
@@ -41,7 +42,11 @@ export function HomePage() {
       <div className="flex flex-col gap-2"><div role="progressbar" aria-label="예산 사용률" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, summary.usedPercent)} aria-valuetext={`${summary.usedPercent}% 사용`} className="flex h-1.5 overflow-hidden rounded-full bg-black-002"><span className="bg-black-100 transition-all" style={{ width: `${Math.min(100, summary.usedPercent)}%` }} /></div><div className="flex items-center justify-between gap-3 text-xs leading-150 text-black-030"><span>예산의 {summary.usedPercent}% 사용</span><span>{period.label}</span></div></div>
       <dl className="flex flex-wrap gap-3"><div className="flex min-w-0 flex-1 flex-col gap-2 rounded-lg bg-black-002 px-4 py-4"><dt className="text-xs leading-150 text-black-030">사용한 금액</dt><dd className="font-numbers break-all text-xl font-semibold leading-140 text-black-100">{formatMoney(summary.spent)}<span className="text-sm">원</span></dd></div><div className="flex min-w-0 flex-1 flex-col gap-2 rounded-lg bg-black-002 px-4 py-4"><dt className="text-xs leading-150 text-black-030">{data.mode === "weekly" ? "주간" : "월간"} 예산</dt><dd className="font-numbers break-all text-xl font-semibold leading-140 text-black-100">{formatMoney(summary.budget)}<span className="text-sm">원</span></dd></div></dl>
     </section>
-    <section aria-label="하루 사용 가능액" className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-black-010 px-4 py-4"><div className="flex flex-col gap-1"><h2 className="text-sm leading-150">하루 사용 가능액</h2><p className="text-xs leading-150 text-black-030">{selectedDate === today ? "오늘 포함 " : `${period.label} · 남은 `}{period.remainingDays}일 · 참고 금액</p></div><p className="font-numbers break-all text-xl font-semibold leading-140 text-black-100">{formatMoney(summary.dailyAvailable)}<span className="text-sm">원</span></p></section>
+    <section aria-label="하루 사용 가능액" className="flex flex-col gap-4 rounded-xl border border-black-020 p-4">
+      <div className="flex items-center justify-between gap-3"><h2 className="text-sm leading-150">하루 사용 가능액</h2><p className="font-numbers text-xl font-semibold leading-140">{formatMoney(dailyBudget)}원</p></div>
+      <p className="font-numbers text-xs leading-160 text-black-030">남은 예산 {formatMoney(summary.remaining)}원 ÷ {selectedDate === today ? "오늘 포함 " : "선택일 포함 "}{period.remainingDays}일</p>
+      {summary.reserved > 0 && <div className="flex flex-col gap-2 border-t border-black-010 pt-3"><div className="flex items-center justify-between gap-3 text-sm"><p>약속 비용 확보 후 하루 금액</p><p className="font-numbers font-semibold">{formatMoney(summary.dailyAvailable)}원</p></div><p className="font-numbers text-xs leading-160 text-black-030">약속 {formatMoney(summary.reserved)}원을 제외한 {formatMoney(Math.max(0, summary.remaining - summary.reserved))}원 ÷ {period.remainingDays}일</p></div>}
+    </section>
     <section className="flex flex-col gap-2"><div className="flex items-center justify-between gap-3"><div className="flex flex-wrap items-center gap-2"><h2 className="text-sm font-semibold leading-150">{period.label} 지출</h2><span className="font-numbers text-xs leading-150 text-black-030">{formatMoney(sumExpenses(periodExpenses))}원</span></div><Link href="/expenses" className="rounded-lg border border-black-020 bg-white px-3 py-2 text-xs">전체 내역</Link></div><ExpenseList expenses={periodExpenses.slice(0, 8)} grouped /></section>
   </div>;
 }
