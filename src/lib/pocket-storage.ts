@@ -16,6 +16,7 @@ let cloudEnabled = false;
 let cloudRevision: number | null = null;
 let pending: PocketData | null = null;
 let flushing = false;
+let refreshing = false;
 let syncMeta: SyncMeta = { revision: null, dirty: false };
 const listeners = new Set<() => void>();
 
@@ -122,12 +123,14 @@ async function flushCloud() {
   } finally { flushing = false; }
 }
 
-export async function retryCloud() {
-  if (flushing) return;
-  setStorage("connecting");
+export async function retryCloud(options: { silent?: boolean } = {}) {
+  if (flushing || refreshing) return;
+  refreshing = true;
+  if (!options.silent) setStorage("connecting");
   try {
     const packet = await readCloud();
     if (!packet) { cloudEnabled = false; setStorage("local"); return; }
+    if (flushing || cloudRevision !== null && packet.revision < cloudRevision) return;
     cloudEnabled = true;
     cloudRevision = packet.revision;
     const current = getSnapshot();
@@ -136,7 +139,7 @@ export async function retryCloud() {
       return;
     }
     if (packet.data && !syncMeta.dirty) {
-      snapshot = { ...current, data: packet.data, storage: "synced" };
+      snapshot = { ...current, data: { ...packet.data, mode: current.data.mode }, storage: "synced" };
       syncMeta = { revision: packet.revision, dirty: false };
       persist();
       emit();
@@ -144,12 +147,13 @@ export async function retryCloud() {
       pending = current.data;
       await flushCloud();
     } else if (packet.data) {
-      snapshot = { ...current, data: packet.data, storage: "synced" };
+      snapshot = { ...current, data: { ...packet.data, mode: current.data.mode }, storage: "synced" };
       syncMeta = { revision: packet.revision, dirty: false };
       persist();
       emit();
     } else { setStorage("synced"); }
   } catch { setStorage("error"); }
+  finally { refreshing = false; }
 }
 
 export async function loadServerCopy() {
@@ -185,13 +189,18 @@ export function subscribe(listener: () => void) {
     const current = getSnapshot();
     const today = todayInSeoul();
     if (today !== current.today) { snapshot = { ...current, today }; emit(); }
+    if (document.visibilityState === "visible" && cloudEnabled && current.storage !== "conflict") void retryCloud({ silent: true });
   };
   window.addEventListener("storage", onStorage);
   window.addEventListener("focus", onFocus);
+  document.addEventListener("visibilitychange", onFocus);
+  window.addEventListener("online", onFocus);
   return () => {
     listeners.delete(listener);
     window.removeEventListener("storage", onStorage);
     window.removeEventListener("focus", onFocus);
+    document.removeEventListener("visibilitychange", onFocus);
+    window.removeEventListener("online", onFocus);
   };
 }
 
