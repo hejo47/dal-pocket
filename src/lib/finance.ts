@@ -33,6 +33,17 @@ export function isFinance(value: unknown): value is Finance {
 export function settlementRecords(payment: Payment): Settlement[] {
   return payment.settlements ?? (payment.settled && payment.split > 1 ? [{ count: payment.split - 1, date: payment.settledDate }] : []);
 }
+export function resizeSettlements(payment: Payment, count: number, date: string): Settlement[] {
+  let remaining = count;
+  const result: Settlement[] = [];
+  for (const receipt of settlementRecords(payment)) {
+    const take = Math.min(remaining, receipt.count);
+    if (take > 0) result.push({ ...receipt, count: take });
+    remaining -= take;
+  }
+  if (remaining > 0) result.push({ count: remaining, date });
+  return result;
+}
 export function settlementSummary(payment: Payment, ownAmount = Math.ceil(payment.gross / payment.split)) {
   const people = payment.split - 1;
   const count = settlementRecords(payment).reduce((sum, receipt) => sum + receipt.count, 0);

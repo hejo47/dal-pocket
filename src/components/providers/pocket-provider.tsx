@@ -12,7 +12,7 @@ import { getServerSnapshot, getSnapshot, loadServerCopy, retryCloud, subscribe, 
 export type ExpenseDraft = { amount: string; category: Category; date: string; memo: string; payment?: Payment; splitInput?: string };
 type EditorState = { open: boolean; expenseId: string | null; draft: ExpenseDraft };
 type Notice = { message: string; action?: { label: string; onClick: () => void } } | null;
-const emptyDraft = (today: string, category: string = CATEGORIES[0]): ExpenseDraft => ({ amount: "", category, date: today, memo: "" });
+const emptyDraft = (today: string, category: string = CATEGORIES[0]): ExpenseDraft => ({ amount: "", category, date: today, memo: "", payment: { gross: 0, split: 1, method: "card", settled: false, settledDate: today } });
 
 function usePocketController() {
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
@@ -83,7 +83,7 @@ function usePocketController() {
       const expenseId = expense?.id ?? null;
       const reuse = expense === undefined && data.categories.includes(current.draft.category) && current.expenseId === expenseId && current.draft.date !== "2000-01-01" && (expense !== undefined || current.draft.date === date);
       const draft = reuse ? current.draft : expense
-        ? { amount: String(financeOf(data).payments[expense.id]?.gross ?? expense.amount), payment: financeOf(data).payments[expense.id], category: expense.category, date: expense.date, memo: expense.memo }
+        ? { amount: String(financeOf(data).payments[expense.id]?.gross ?? expense.amount), payment: financeOf(data).payments[expense.id] ?? { gross: expense.amount, split: 1, method: "cash", settled: false, settledDate: expense.date }, category: expense.category, date: expense.date, memo: expense.memo }
         : emptyDraft(date, data.categories[0] ?? CATEGORIES[0]);
       return { open: true, expenseId, draft };
     });
@@ -102,7 +102,7 @@ function usePocketController() {
     const expense: Expense = { id: expenseId ?? crypto.randomUUID(), amount: Math.ceil(amount / (draft.payment?.split ?? 1)), category: draft.category, date: draft.date, memo: draft.memo.trim() };
     const persisted = updatePocket((current) => {
       const finance = financeOf(current);
-      finance.payments = { ...finance.payments, [expense.id]: { gross: amount, split: 1, method: "cash", settled: false, settledDate: today, ...draft.payment } };
+      finance.payments = { ...finance.payments, [expense.id]: { gross: amount, split: 1, method: "card", settled: false, settledDate: today, ...draft.payment } };
       finance.payments[expense.id].gross = amount;
       if (expenseId) return { ...current, finance, expenses: current.expenses.map((item) => item.id === expenseId ? expense : item) };
       return { ...current, finance, isDemo: false, expenses: [expense, ...(current.isDemo ? [] : current.expenses)] };
