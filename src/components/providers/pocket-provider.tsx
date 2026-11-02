@@ -9,7 +9,7 @@ import type { Finance, Payment } from "@/lib/finance";
 import type { BudgetMode, Category, Expense, FontPreferences } from "@/lib/pocket";
 import { getServerSnapshot, getSnapshot, loadServerCopy, retryCloud, subscribe, updatePocket } from "@/lib/pocket-storage";
 
-export type ExpenseDraft = { amount: string; category: Category; date: string; memo: string; payment?: Payment };
+export type ExpenseDraft = { amount: string; category: Category; date: string; memo: string; payment?: Payment; splitInput?: string };
 type EditorState = { open: boolean; expenseId: string | null; draft: ExpenseDraft };
 type Notice = { message: string; action?: { label: string; onClick: () => void } } | null;
 const emptyDraft = (today: string, category: string = CATEGORIES[0]): ExpenseDraft => ({ amount: "", category, date: today, memo: "" });

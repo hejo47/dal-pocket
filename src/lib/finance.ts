@@ -5,7 +5,8 @@ export type MoneyEntry = { id: string; date: string; amount: number; memo: strin
 export type SavingsEntry = MoneyEntry & { direction: "deposit" | "withdraw" };
 export type Installment = MoneyEntry & { months: number };
 export type FixedExpense = MoneyEntry & { endMonth?: string; includeInBudget?: boolean; method?: "cash" | "card"; cadence?: "monthly" | "sessions"; sessionsPerPayment?: number; sessionDates?: string[]; paymentDates?: string[] };
-export type Payment = { gross: number; split: number; method: "cash" | "card"; settled: boolean; settledDate: string; note?: string; groceries?: boolean };
+export type Settlement = { count: number; date: string };
+export type Payment = { gross: number; split: number; method: "cash" | "card"; settled: boolean; settledDate: string; note?: string; groceries?: boolean; settlements?: Settlement[] };
 export type Finance = {
   months: Record<string, { budget: number; groceries: number }>;
   openingBalance: number; openingDate: string; billingDay: number; closingDay?: number; billingOffset?: number;
@@ -27,7 +28,21 @@ export function isFinance(value: unknown): value is Finance {
     && (data.savings === undefined || Array.isArray(data.savings) && data.savings.length <= 10000 && data.savings.every((item) => entry(item) && ["deposit", "withdraw"].includes(item.direction)))
     && Array.isArray(data.installments) && data.installments.length <= 1000 && data.installments.every((item) => entry(item) && Number.isInteger(item.months) && item.months >= 2 && item.months <= 60)
     && (data.fixedExpenses === undefined || Array.isArray(data.fixedExpenses) && data.fixedExpenses.length <= 1000 && data.fixedExpenses.every((item) => entry(item) && (item.method === undefined || ["cash", "card"].includes(item.method)) && (item.cadence === undefined || ["monthly", "sessions"].includes(item.cadence)) && (item.cadence !== "sessions" || Number.isInteger(item.sessionsPerPayment) && item.sessionsPerPayment! >= 1 && item.sessionsPerPayment! <= 100 && Array.isArray(item.sessionDates) && item.sessionDates.length <= 10000 && item.sessionDates.every((date) => isDateKey(date) && date >= item.date) && Array.isArray(item.paymentDates) && item.paymentDates.length >= 1 && item.paymentDates.length <= 10000 && item.paymentDates.every((date) => isDateKey(date) && date >= item.date)) && (item.includeInBudget === undefined || typeof item.includeInBudget === "boolean") && (!item.endMonth || isDateKey(item.endMonth + "-01") && item.endMonth >= item.date.slice(0, 7))))
-    && !!data.payments && typeof data.payments === "object" && Object.values(data.payments).every((item) => item && amount(item.gross) && Number.isInteger(item.split) && item.split >= 1 && item.split <= 100 && ["cash", "card"].includes(item.method) && (item.groceries === undefined || typeof item.groceries === "boolean") && typeof item.settled === "boolean" && isDateKey(item.settledDate) && (item.note === undefined || typeof item.note === "string" && item.note.length <= 200));
+    && !!data.payments && typeof data.payments === "object" && Object.values(data.payments).every((item) => item && amount(item.gross) && Number.isInteger(item.split) && item.split >= 1 && item.split <= 100 && ["cash", "card"].includes(item.method) && (item.groceries === undefined || typeof item.groceries === "boolean") && (item.settlements === undefined || Array.isArray(item.settlements) && item.settlements.length <= 100 && item.settlements.every((receipt) => receipt && Number.isInteger(receipt.count) && receipt.count > 0 && isDateKey(receipt.date)) && item.settlements.reduce((sum,receipt) => sum + receipt.count, 0) <= item.split - 1) && typeof item.settled === "boolean" && isDateKey(item.settledDate) && (item.note === undefined || typeof item.note === "string" && item.note.length <= 200));
+}
+export function settlementRecords(payment: Payment): Settlement[] {
+  return payment.settlements ?? (payment.settled && payment.split > 1 ? [{ count: payment.split - 1, date: payment.settledDate }] : []);
+}
+export function settlementSummary(payment: Payment, ownAmount = Math.ceil(payment.gross / payment.split)) {
+  const people = payment.split - 1;
+  const count = settlementRecords(payment).reduce((sum, receipt) => sum + receipt.count, 0);
+  const total = Math.max(0, payment.gross - ownAmount);
+  const receivedAmount = people > 0 ? Math.floor(total * count / people) : 0;
+  return { people, count, total, receivedAmount, outstanding: total - receivedAmount };
+}
+export function unsettledExpenses(data: PocketData, category = "전체") {
+  const payments = financeOf(data).payments;
+  return data.expenses.filter((expense) => (category === "전체" || expense.category === category) && payments[expense.id] && settlementSummary(payments[expense.id], expense.amount).outstanding > 0).sort((a,b) => b.date.localeCompare(a.date));
 }
 export const financeOf = (data: PocketData): Finance => ({ ...emptyFinance(), ...data.finance });
 export function monthDays(month: string) { return Number(getPeriod("monthly", 1, `${month}-01`).end.slice(8)); }
@@ -134,8 +149,16 @@ export function cashFlow(data: PocketData, month: string) {
     if (payment?.method === "card") { if (expense.date <= end && dueDate > end) futureCard += gross; if (inRange(dueDate)) cardOut += gross; if (dueDate.slice(0, 7) === month) dueThisMonth += gross; }
     else if (inRange(expense.date)) cashOut += gross;
     if (payment && expense.date <= end) {
-      if (payment.settled && inRange(payment.settledDate || expense.date)) received += gross - expense.amount;
-      else if (!payment.settled) receivable += gross - expense.amount;
+      const total = Math.max(0, gross - expense.amount);
+      const people = payment.split - 1;
+      let count = 0, paidAsOfEnd = 0;
+      for (const receipt of settlementRecords(payment)) {
+        const portion = people > 0 ? Math.floor(total * (count + receipt.count) / people) - Math.floor(total * count / people) : 0;
+        count += receipt.count;
+        if (receipt.date <= end) paidAsOfEnd += portion;
+        if (inRange(receipt.date)) received += portion;
+      }
+      receivable += total - paidAsOfEnd;
     }
   }
   let fixedCardOut = 0;

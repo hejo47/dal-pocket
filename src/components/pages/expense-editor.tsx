@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 
+import { SettlementEditor } from "@/components/pages/settlement-editor";
+import { settlementRecords } from "@/lib/finance";
 import { usePocket } from "@/components/providers/pocket-provider";
 import { PillButton } from "@/components/ui/pill-button";
 import { ActionButtonRow } from "@/components/ui/action-button-row";
@@ -19,12 +21,16 @@ export function ExpenseEditor() {
   const [categoryName,setCategoryName] = useState("");
   const payment = { gross: parseAmount(editor.draft.amount), split: 1, method: "cash" as "cash" | "card", settled: false, settledDate: pocket.today, note: "", groceries: false, ...editor.draft.payment };
   const updatePayment = (patch: Partial<typeof payment>) => updateDraft({ payment: { ...payment, ...patch } });
+  const splitInput = editor.draft.splitInput ?? String(payment.split);
+  const splitValid = Number.isInteger(Number(splitInput)) && Number(splitInput) >= 1 && Number(splitInput) <= 100 && splitInput.trim() !== "";
   const editing = editor.expenseId !== null;
   function submit(event: FormEvent) {
     event.preventDefault();
     const amount = parseAmount(editor.draft.amount);
     if (!validAmount(amount)) { setError("지출 금액을 1원부터 1억 원까지 입력해주세요."); return; }
     if (!isDateKey(editor.draft.date) || editor.draft.date > pocket.today) { setError("오늘 또는 이전 날짜를 선택해주세요."); return; }
+    if (!splitValid) { setError("나눌 인원을 1명부터 100명까지 입력해주세요."); return; }
+    if (settlementRecords(payment).reduce((sum,receipt)=>sum+receipt.count,0) > payment.split - 1) { setError("이미 정산받은 인원보다 나눌 인원이 작습니다. 정산 기록을 먼저 수정해주세요."); return; }
     setError("");
     pocket.saveExpense(amount);
   }
@@ -37,7 +43,7 @@ export function ExpenseEditor() {
       <form id="expense-form" onSubmit={submit} className="flex min-h-0 flex-col gap-5">
         <div className="pocket-dialog-scroll flex min-h-0 flex-col gap-5 overflow-y-auto p-1">
           <div className="flex flex-col gap-2"><FieldLabel htmlFor="expense-amount" required>결제한 원래 금액</FieldLabel><div className="flex items-center gap-2 rounded-lg border border-black-010 px-3 py-3"><TextField id="expense-amount" required inputMode="numeric" autoComplete="off" placeholder="0" className="font-numbers border-0 px-0 py-0 text-3xl" value={editor.draft.amount ? formatMoney(parseAmount(editor.draft.amount)) : ""} onChange={(event) => { updateDraft({ amount: event.target.value.replace(/\D/g, "").slice(0, 9) }); setError(""); }} /><span className="text-sm text-black-030">원</span></div></div>
-          <div className="flex flex-col gap-2 rounded-lg bg-black-002 p-3"><FieldLabel htmlFor="expense-split">나눌 인원 (본인 포함)</FieldLabel><TextField id="expense-split" type="number" min={1} max={100} value={payment.split} onChange={(event) => updatePayment({ split: Math.max(1, Math.min(100, Number(event.target.value))) })} /><FieldHint>총 {formatMoney(parseAmount(editor.draft.amount))}원 ÷ {payment.split}명 = 내 부담 {formatMoney(Math.ceil(parseAmount(editor.draft.amount) / payment.split))}원. 생활 예산에는 내 부담액만 반영합니다.</FieldHint><FieldLabel htmlFor="expense-method">결제 방법</FieldLabel><SelectField id="expense-method" value={payment.method} options={[{value:"cash",label:"현금·체크카드 (즉시 출금)"},{value:"card",label:"신용카드 (결제일 출금)"}]} onChange={(event)=>updatePayment({method:event.target.value as "cash"|"card"})} />{payment.split > 1 && <><label className="flex items-center gap-2 py-2 text-sm"><input type="checkbox" checked={payment.settled} onChange={(event)=>updatePayment({settled:event.target.checked,settledDate:pocket.today})} />정산 받음 (받을 금액 {formatMoney(parseAmount(editor.draft.amount) - Math.ceil(parseAmount(editor.draft.amount)/payment.split))}원)</label>{payment.settled && <DateField aria-label="정산 받은 날짜" required max={pocket.today} value={payment.settledDate} onChange={(event)=>updatePayment({settledDate:event.target.value})} />}</>}</div>
+          <div className="flex flex-col gap-2 rounded-lg bg-black-002 p-3"><FieldLabel htmlFor="expense-split">나눌 인원 (본인 포함)</FieldLabel><TextField id="expense-split" type="text" inputMode="numeric" required maxLength={3} value={splitInput} onChange={(event) => { const value=event.target.value.replace(/\D/g, ""); const count=Number(value); updateDraft({ splitInput:value, payment:{...payment, settlements:settlementRecords(payment), split:count >= 1 && count <= 100 ? count : payment.split} }); setError(""); }} /><FieldHint>총 {formatMoney(parseAmount(editor.draft.amount))}원 ÷ {payment.split}명 = 내 부담 {formatMoney(Math.ceil(parseAmount(editor.draft.amount) / payment.split))}원. 생활 예산에는 내 부담액만 반영합니다.</FieldHint><FieldLabel htmlFor="expense-method">결제 방법</FieldLabel><SelectField id="expense-method" value={payment.method} options={[{value:"cash",label:"현금·체크카드 (즉시 출금)"},{value:"card",label:"신용카드 (결제일 출금)"}]} onChange={(event)=>updatePayment({method:event.target.value as "cash"|"card"})} />{payment.split > 1 && <SettlementEditor payment={payment} onChange={updatePayment} today={pocket.today} />}</div>
           <div className="flex flex-col gap-2"><div className="flex items-center justify-between gap-2"><FieldLabel htmlFor="expense-category" required>카테고리</FieldLabel><PillButton type="button" variant="outline" size="sm" onClick={()=>setAddingCategory((value)=>!value)}>＋ 카테고리 추가</PillButton></div><SelectField id="expense-category" value={editor.draft.category} options={pocket.data.categories.map((category) => ({ value: category, label: category }))} onChange={(event) => updateDraft({ category: event.target.value })} />{addingCategory && <div className="flex min-w-0 gap-2"><TextField aria-label="추가할 카테고리 이름" maxLength={10} placeholder="카테고리 이름" value={categoryName} onChange={(event)=>setCategoryName(event.target.value)} /><PillButton type="button" size="sm" onClick={()=>{if(pocket.addCategory(categoryName)){updateDraft({category:categoryName.trim()});setCategoryName("");setAddingCategory(false);setError("");}else setError("카테고리 이름과 중복 여부를 확인해주세요. 최대 30개까지 등록할 수 있습니다.");}}>추가</PillButton></div>}</div>
           <div className="flex flex-col gap-2"><FieldLabel htmlFor="expense-date" required>날짜</FieldLabel><DateField id="expense-date" required max={pocket.today} value={editor.draft.date} onChange={(event) => { updateDraft({ date: event.target.value }); setError(""); }} /></div>
           <div className="flex flex-col gap-2"><FieldLabel htmlFor="expense-memo">소비 내용 <span className="text-xs">선택</span></FieldLabel><TextField id="expense-memo" maxLength={80} placeholder="예: 친구와 점심" value={editor.draft.memo} onChange={(event) => updateDraft({ memo: event.target.value })} /></div>
