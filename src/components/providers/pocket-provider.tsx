@@ -5,12 +5,12 @@ import type { ReactNode } from "react";
 
 import { CATEGORIES, getPeriod, getPeriodExpenses, todayInSeoul } from "@/lib/pocket";
 import { financeOf, financeSummary } from "@/lib/finance";
-import type { Finance, Payment } from "@/lib/finance";
+import type { Finance, MoneyEntry, Payment } from "@/lib/finance";
 import type { BudgetMode, Category, Expense, FontPreferences } from "@/lib/pocket";
 import { getServerSnapshot, getSnapshot, loadServerCopy, retryCloud, subscribe, updatePocket } from "@/lib/pocket-storage";
 
 export type ExpenseDraft = { amount: string; category: Category; date: string; memo: string; payment?: Payment; splitInput?: string };
-type EditorState = { open: boolean; expenseId: string | null; draft: ExpenseDraft };
+type EditorState = { planId?: string; open: boolean; expenseId: string | null; draft: ExpenseDraft };
 type Notice = { message: string; action?: { label: string; onClick: () => void } } | null;
 const emptyDraft = (today: string, category: string = CATEGORIES[0]): ExpenseDraft => ({ amount: "", category, date: today, memo: "", payment: { gross: 0, split: 1, method: "card", settled: false, settledDate: today } });
 
@@ -91,6 +91,15 @@ function usePocketController() {
       return { open: true, expenseId, draft };
     });
   }
+  function openPlanExpense(plan: MoneyEntry) {
+    returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setEditor({
+      open: true,
+      expenseId: null,
+      planId: plan.id,
+      draft: { ...emptyDraft(plan.date, data.categories[0] ?? CATEGORIES[0]), memo: plan.memo },
+    });
+  }
   function closeEditor() { setEditor((current) => ({ ...current, open: false })); }
   function restoreEditorFocus() {
     const origin = returnFocus.current;
@@ -101,10 +110,11 @@ function usePocketController() {
     setEditor((current) => ({ ...current, draft: { ...current.draft, ...patch } }));
   }
   function saveExpense(amount: number) {
-    const { expenseId, draft } = editor;
+    const { expenseId, draft, planId } = editor;
     const expense: Expense = { id: expenseId ?? crypto.randomUUID(), amount: Math.ceil(amount / (draft.payment?.split ?? 1)), category: draft.category, date: draft.date, memo: draft.memo.trim() };
     const persisted = updatePocket((current) => {
       const finance = financeOf(current);
+      if (planId) finance.plans = finance.plans.filter((plan) => plan.id !== planId);
       finance.payments = { ...finance.payments, [expense.id]: { gross: amount, split: 1, method: "card", settled: false, settledDate: today, ...draft.payment } };
       finance.payments[expense.id].gross = amount;
       if (expenseId) return { ...current, finance, expenses: current.expenses.map((item) => item.id === expenseId ? expense : item) };
@@ -134,7 +144,7 @@ function usePocketController() {
   }
 
   return { data, today, ready, storage, retryCloud, loadServerCopy, period, expenses, summary, category, setCategory, dailyView, setMode,
-    saveBudget, saveMonthlyBudget, saveFinance, addCategory, deleteCategory, notice, dismissNotice, editor, openEditor, closeEditor,
+    saveBudget, saveMonthlyBudget, saveFinance, addCategory, deleteCategory, notice, dismissNotice, editor, openEditor, openPlanExpense, closeEditor,
     updateDraft, saveExpense, deleteExpense, restoreEditorFocus, startOwnRecords, saveFonts };
 }
 
