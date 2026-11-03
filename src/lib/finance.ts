@@ -172,6 +172,7 @@ export function cashFlow(data: PocketData, month: string) {
       receivable += total - paidAsOfEnd;
     }
   }
+  const cardBill = dueThisMonth;
   let fixedCardOut = 0;
   for (const item of finance.fixedExpenses ?? []) {
     if (item.method !== "card") continue;
@@ -205,5 +206,5 @@ export function cashFlow(data: PocketData, month: string) {
   const savingsTransfer = savings.filter((item) => inRange(item.date)).reduce((sum,item) => sum + (item.direction === "deposit" ? item.amount : -item.amount), 0);
   const balance = finance.openingBalance + income + received - cashOut - cardOut - installments - fixedCashOut - savingsTransfer;
   const availableBalance = balance - futureCard - installmentOutstanding - planned;
-  return { savedMonth, withdrawnMonth, savingsBalance, savingsTransfer, fixedCashOut, fixedCardOut, fixedMonth, fixedOut, monthSpent, availableBalance, installmentOutstanding, futureCard, balance, income, cashOut, cardOut, received, receivable, installmentMonth, dueThisMonth, planned, recommendedLimit: Math.max(0, Math.min(livingRemaining, availableBalance)) };
+  return { savedMonth, withdrawnMonth, savingsBalance, savingsTransfer, fixedCashOut, fixedCardOut, fixedMonth, fixedOut, monthSpent, availableBalance, installmentOutstanding, futureCard, balance, income, cashOut, cardOut, received, receivable, installmentMonth, cardBill, dueThisMonth, planned, recommendedLimit: Math.max(0, Math.min(livingRemaining, availableBalance)) };
 }
