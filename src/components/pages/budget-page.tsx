@@ -1,5 +1,7 @@
 "use client";
 
+import { PeriodPicker } from "@/components/ui/period-picker";
+
 import { useState } from "react";
 
 import { usePocket } from "@/components/providers/pocket-provider";
@@ -49,7 +51,7 @@ function BudgetView() {
   const [month, setMonth] = useState(pocket.today.slice(0, 7));
   const setting = monthSettings(pocket.data, month);
   return <div className="flex w-full min-w-0 max-w-content flex-col gap-5">
-    <div className="flex flex-col gap-2 rounded-xl border border-black-020 bg-black-002 p-4"><FieldLabel htmlFor="budget-month" required>예산을 설정할 달</FieldLabel><TextField id="budget-month" type="month" value={month} onChange={(event) => { if (event.target.value) setMonth(event.target.value); }} /></div>
+    <PeriodPicker date={month + "-01"} onChange={(date) => setMonth(date.slice(0, 7))} />
     <ScreenTitle title={pocket.data.mode === "weekly" ? "주간 예산" : "월간 예산"} subtitle={pocket.data.mode === "weekly" ? "주당 금액을 입력하세요" : "월 총액을 주별로 나눠 편성합니다"} />
     <BudgetForm key={`${month}-${pocket.data.mode}-${setting.budget}-${setting.groceries}`} month={month} />
   </div>;

@@ -1,5 +1,7 @@
 "use client";
 
+import { PeriodPicker } from "@/components/ui/period-picker";
+
 import { MoneyRow } from "@/components/ui/money-row";
 import { SavingsSection } from "@/components/pages/savings-section";
 import { FixedExpenses } from "@/components/pages/fixed-expenses";
@@ -24,7 +26,7 @@ function FinanceView({ initialMonth }: { initialMonth: string }) {
  const nextInstallment = finance.installments.reduce((sum, item) => sum + installmentDue(item, followingMonth), 0);
  function save(next: Finance) { pocket.saveFinance(next); }
  return <div className="flex w-full min-w-0 max-w-content flex-col gap-6"><ScreenTitle title="현금 흐름·예정 지출" subtitle="수입, 카드 출금, 할부, 정산을 반영한 월말 예상 잔액" />
- <TextField aria-label="조회할 달" type="month" value={month} onChange={(event)=>{if(event.target.value)setMonth(event.target.value);}} />
+    <PeriodPicker date={month + "-01"} onChange={(date) => setMonth(date.slice(0, 7))} />
  <div className="grid grid-cols-2 gap-3"><a href="#fixed-costs" onClick={() => setFixedOpen(true)} className="flex min-w-0 flex-col gap-2 rounded-xl border border-black-020 bg-black-002 p-4"><span className="text-xs text-black-030">이달 고정 비용만</span><span className="font-numbers break-all text-xl">{formatMoney(flow.fixedMonth)}원</span><span className="text-xs">고정 내역 보기 ↓</span></a><a href="#savings" className="flex min-w-0 flex-col gap-2 rounded-xl border border-black-020 bg-black-002 p-4"><span className="text-xs text-black-030">이달 순저축</span><span className="font-numbers break-all text-xl">{formatMoney(flow.savedMonth - flow.withdrawnMonth)}원</span><span className="text-xs">저축 등록·확인 ↓</span></a></div>
  <section className="flex flex-col gap-3 rounded-xl border border-black-100 bg-black-002 p-4"><h2 className="font-semibold">{month} 월말 예상 현금 잔액</h2>{finance.openingDate === "2000-01-01" && <p className="text-xs text-red-2">아래 현금·카드 설정에서 시작 잔액과 기준일을 먼저 저장해주세요.</p>}{finance.openingDate !== "2000-01-01" && (finance.openingDate.slice(0, 7) <= month ? <>
    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1"><p className={"font-numbers text-3xl " + (flow.balance < 0 ? "text-red-2" : "text-black-100")}>{formatMoney(flow.balance)}원</p><span className="font-numbers text-xs text-black-030">미수금 {formatMoney(flow.receivable)}원</span></div>

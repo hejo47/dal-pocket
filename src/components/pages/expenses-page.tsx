@@ -1,21 +1,21 @@
 "use client";
 
+import { PeriodPicker } from "@/components/ui/period-picker";
+
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { ExpenseList } from "@/components/pages/expense-list";
 import { usePocket } from "@/components/providers/pocket-provider";
 import { ActionButtonRow } from "@/components/ui/action-button-row";
-import { IconContainer } from "@/components/ui/icon-container";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PillButton } from "@/components/ui/pill-button";
 import { FieldLabel, SelectField, TextField } from "@/components/ui/form-field";
 import { PageSkeleton, ScreenTitle } from "@/components/ui/screen-title";
 
 import { fixedTotal, financeOf, settlementSummary, unsettledExpenses } from "@/lib/finance";
-import { formatMoney, getPeriod, getPeriodExpenses, isDateKey, offsetDate, sumExpenses } from "@/lib/pocket";
+import { formatMoney, getPeriod, getPeriodExpenses, isDateKey, sumExpenses } from "@/lib/pocket";
 
 import { downloadSettlementPng } from "@/lib/settlement-png";
 
@@ -80,22 +80,7 @@ function ExpenseResults({ month, initialCategory }: { month: string | null; init
   return <div className="flex w-full max-w-content flex-col gap-6">
     <ScreenTitle title="지출 내역" subtitle={unsettledOnly ? "전체 기간 · 선택한 카테고리의 미정산 내역" : mode === "weekly" ? "주별로 기록을 확인할 수 있어요" : `${period.label} · ${period.scope}`} />
     <PillButton variant={unsettledOnly ? "filled" : "outline"} className="self-start" aria-pressed={unsettledOnly} onClick={() => setUnsettledOnly((value) => !value)}>미정산만 보기{unsettledOnly ? " · 전체 기간" : ""}</PillButton>
-    {!unsettledOnly && mode === "monthly" && <div className="flex items-center gap-2">
-      <PillButton aria-label="이전 달" variant="outline" size="icon" className="shrink-0" onClick={() => setViewDate(offsetDate(period.start, -1).slice(0, 7) + "-01")}>
-        <IconContainer size="slg"><ChevronLeft /></IconContainer>
-      </PillButton>
-      <div className="min-w-0 flex-1">
-        <TextField aria-label="조회할 달" type="month" value={period.start.slice(0, 7)} max={pocket.today.slice(0, 7)} onChange={(event) => {
-          const date = event.target.value + "-01";
-          if (isDateKey(date) && date <= pocket.today) setViewDate(date);
-        }} />
-      </div>
-      <PillButton aria-label="다음 달" variant="outline" size="icon" className="shrink-0" disabled={period.end >= pocket.today} onClick={() => setViewDate(offsetDate(period.end, 1))}>
-        <IconContainer size="slg"><ChevronRight /></IconContainer>
-      </PillButton>
-    </div>}
-    {!unsettledOnly && mode === "weekly" && <div className="flex flex-col gap-2"><FieldLabel htmlFor="view-date">조회할 날짜</FieldLabel><TextField id="view-date" type="date" max={pocket.today} value={selectedDate} onChange={(event) => { if (event.target.value) setViewDate(event.target.value); }} /></div>}
-    {!unsettledOnly && mode === "weekly" && <div className="flex items-center justify-between rounded-lg border border-black-010 px-3 py-2"><PillButton aria-label="이전 주" variant="ghost" size="icon" onClick={() => setViewDate(offsetDate(period.start, -1))}><IconContainer size="slg"><ChevronLeft /></IconContainer></PillButton><span className="text-sm leading-150">{period.start.slice(0, 7)} · {period.weekNumber}주차 · {period.label}</span><PillButton aria-label="다음 주" variant="ghost" size="icon" disabled={period.end >= pocket.today} onClick={() => setViewDate(offsetDate(period.end, 1))}><IconContainer size="slg"><ChevronRight /></IconContainer></PillButton></div>}
+    {!unsettledOnly && <PeriodPicker mode={mode} date={selectedDate} maxDate={pocket.today} weekStartsOn={pocket.data.weekStartsOn} onChange={setViewDate} />}
     <div className="flex items-center justify-between gap-3"><span className="text-sm leading-150 text-black-030">{unsettledOnly ? (category === "전체" ? "전체" : category) + " 미정산 · " + filtered.length + "건" : category === "전체" ? "전체 지출" : `${category} 지출`}</span><p className="font-numbers text-2xl leading-140">{formatMoney(unsettledOnly ? outstandingTotal : sumExpenses(filtered))}원</p></div>
     {!unsettledOnly && <p className="rounded-xl border border-black-010 bg-black-002 p-3 text-sm">고정 지출 합계 (일반 지출과 별도): {formatMoney(fixedTotal(pocket.data, period.start, period.end))}원</p>}
     <section className="flex flex-col gap-3" aria-label="카테고리"><div className="flex items-center justify-between gap-2"><h2 className="text-sm leading-150">카테고리</h2><PillButton type="button" variant="ghost" size="sm" aria-pressed={managingCategories} onClick={() => setManagingCategories((value) => !value)}>{managingCategories ? "관리 완료" : "카테고리 관리"}</PillButton></div><div className="flex flex-wrap gap-2" aria-label="카테고리 필터"><PillButton variant={category === "전체" ? "filled" : "outline"} size="sm" aria-pressed={category === "전체"} onClick={() => selectCategory("전체")}>전체</PillButton>{pocket.data.categories.map((item) => <div key={item} className="flex items-center gap-1"><PillButton variant={category === item ? "filled" : "outline"} size="sm" aria-pressed={category === item} onClick={() => selectCategory(item)}>{item}</PillButton>{managingCategories && <PillButton type="button" variant="ghost" size="icon" className="text-xs" aria-label={`${item} 삭제`} disabled={pocket.data.categories.length <= 1} onClick={() => { setCategoryToDelete(item); setReplacementCategory(pocket.data.categories.find((candidate) => candidate !== item) ?? ""); }}>삭제</PillButton>}</div>)}<PillButton type="button" variant="ghost" size="sm" disabled={pocket.data.categories.length >= 30} onClick={() => { setAddingCategory((value) => !value); setCategoryError(""); }}>＋ 카테고리 추가</PillButton></div>

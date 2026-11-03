@@ -1,8 +1,10 @@
 "use client";
 
+import { PeriodPicker } from "@/components/ui/period-picker";
+
 import Link from "next/link";
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import { ExpenseList } from "@/components/pages/expense-list";
 import { usePocket } from "@/components/providers/pocket-provider";
@@ -10,7 +12,7 @@ import { IconContainer } from "@/components/ui/icon-container";
 import { PillButton } from "@/components/ui/pill-button";
 import { PageSkeleton, ScreenTitle } from "@/components/ui/screen-title";
 
-import { formatMoney, getCalendarMonth, offsetDate, shortDate, sumExpenses, WEEKDAYS } from "@/lib/pocket";
+import { formatMoney, getCalendarMonth, shortDate, sumExpenses, WEEKDAYS } from "@/lib/pocket";
 import { financeOf, financeSummary } from "@/lib/finance";
 import { cn } from "@/lib/utils";
 
@@ -24,18 +26,13 @@ function CalendarView() {
   const selectedExpenses = pocket.data.expenses.filter((expense) => expense.date === selected);
   const weekdays = Array.from({ length: 7 }, (_, index) => WEEKDAYS[(pocket.data.weekStartsOn + index) % 7]);
   const monthLabel = `${Number(month.slice(0, 4))}년 ${Number(month.slice(5, 7))}월`;
-  function moveMonth(direction: number) {
-    const next = offsetDate(direction < 0 ? calendar.period.start : calendar.period.end, direction).slice(0, 7);
-    setMonth(next);
-    setSelected(next === pocket.today.slice(0, 7) ? pocket.today : `${next}-01`);
-  }
   return <div className="flex w-full max-w-content flex-col gap-6">
     <ScreenTitle title="소비 달력" subtitle="매월 1일부터 말일까지의 전체 지출" action={<PillButton variant="outline" size="sm" onClick={() => { setMonth(pocket.today.slice(0, 7)); setSelected(pocket.today); }}>오늘</PillButton>} />
-    <div className="flex items-center justify-between gap-3">
-      <PillButton variant="ghost" size="icon" aria-label="이전 달" onClick={() => moveMonth(-1)}><IconContainer><ChevronLeft /></IconContainer></PillButton>
-      <h2 className="font-numbers text-lg leading-150" aria-live="polite">{monthLabel}</h2>
-      <PillButton variant="ghost" size="icon" aria-label="다음 달" onClick={() => moveMonth(1)}><IconContainer><ChevronRight /></IconContainer></PillButton>
-    </div>
+    <PeriodPicker date={month + "-01"} onChange={(date) => {
+      const next = date.slice(0, 7);
+      setMonth(next);
+      setSelected(next === pocket.today.slice(0, 7) ? pocket.today : date);
+    }} />
     <div className="flex items-center justify-between gap-3 rounded-lg bg-black-002 p-4"><div className="flex flex-col gap-1"><p className="text-xs leading-150 text-black-030">이달 사용 금액</p><p className="font-numbers text-2xl leading-140">{formatMoney(calendar.total)}원</p></div><p className="font-numbers text-xs leading-150 text-black-030">{calendar.recordedDays}일 기록</p></div>
     <section aria-label={`${monthLabel} 날짜별 지출`} className="flex flex-col gap-4 rounded-xl border border-black-010 bg-black-002 p-3 sm:p-4">
       <div className="grid grid-cols-7 gap-1">{weekdays.map((day) => <span key={day} className="pb-2 text-center text-xs leading-150 text-black-030">{day.slice(0, 1)}</span>)}</div>

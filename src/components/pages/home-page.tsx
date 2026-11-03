@@ -1,26 +1,26 @@
 "use client";
 
+import { PeriodPicker } from "@/components/ui/period-picker";
+
 import { MoneyRow } from "@/components/ui/money-row";
 
 import Link from "next/link";
 import { useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
 import { ExpenseList } from "@/components/pages/expense-list";
 import { usePocket } from "@/components/providers/pocket-provider";
 import { PageSkeleton, ScreenTitle } from "@/components/ui/screen-title";
 import { PillButton } from "@/components/ui/pill-button";
-import { DateField, FieldLabel } from "@/components/ui/form-field";
 import { IconContainer } from "@/components/ui/icon-container";
 
 import { cashFlow, financeSummary, foodBudgetSummary } from "@/lib/finance";
-import { formatMoney, getPeriod, getPeriodExpenses, offsetDate, shortDate, sumExpenses } from "@/lib/pocket";
+import { formatMoney, getPeriod, getPeriodExpenses, shortDate, sumExpenses } from "@/lib/pocket";
 
 export function HomePage() {
   const pocket = usePocket();
   const [viewDate, setViewDate] = useState<string | null>(null);
   const [visibleExpenses, setVisibleExpenses] = useState({ period: "", count: 8 });
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
   if (!pocket.ready) return <PageSkeleton />;
   const { data, today } = pocket;
   const selectedDate = viewDate ?? today;
@@ -35,14 +35,7 @@ export function HomePage() {
   const periodLabel = `${Number(period.start.slice(5, 7))}월 ${period.weekNumber}주`;
   return <div className="flex w-full max-w-content flex-col gap-7">
     <ScreenTitle title={data.mode === "weekly" ? `${periodLabel} 예산` : `${Number(selectedDate.slice(5, 7))}월 예산`} subtitle={`${shortDate(period.start)}–${shortDate(period.end)}`} action={<Link href="/budget" className="rounded-lg border border-black-020 bg-white px-3 py-2 text-xs leading-150">예산 수정</Link>} />
-    <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex w-full min-w-0 items-center gap-1 rounded-full bg-black-002 p-1">
-        <PillButton variant="ghost" size="icon" className="shrink-0 rounded-full border-transparent bg-transparent hover:bg-white" aria-label={data.mode === "weekly" ? "이전 주" : "이전 달"} onClick={() => setViewDate(offsetDate(period.start, -1))}><IconContainer size="slg"><ChevronLeft /></IconContainer></PillButton>
-        <PillButton variant="ghost" className="min-w-0 flex-1 rounded-full border-transparent bg-transparent px-2 py-2 hover:bg-white" aria-expanded={datePickerOpen} aria-controls="home-period-picker" aria-label="조회 기간 변경" onClick={() => setDatePickerOpen((open) => !open)}><span className="font-numbers text-sm">{period.label}</span><IconContainer size="sm"><ChevronDown /></IconContainer></PillButton>
-        <PillButton variant="ghost" size="icon" className="shrink-0 rounded-full border-transparent bg-transparent hover:bg-white" aria-label={data.mode === "weekly" ? "다음 주" : "다음 달"} disabled={period.end >= today} onClick={() => setViewDate(offsetDate(period.end, 1))}><IconContainer size="slg"><ChevronRight /></IconContainer></PillButton>
-      </div>
-      {datePickerOpen && <div id="home-period-picker" className="flex min-w-0 flex-col gap-2 rounded-xl border border-black-010 p-3"><FieldLabel htmlFor="home-period-date">날짜로 이동</FieldLabel><DateField id="home-period-date" max={today} value={selectedDate} onChange={(event) => { if (event.target.value) { setViewDate(event.target.value); setDatePickerOpen(false); } }} /><PillButton variant="outline" size="sm" onClick={() => { setViewDate(null); setDatePickerOpen(false); }}>{data.mode === "weekly" ? "이번 주로" : "이번 달로"}</PillButton></div>}
-    </div>
+    <PeriodPicker mode={data.mode} date={selectedDate} maxDate={today} weekStartsOn={data.weekStartsOn} onChange={(date) => setViewDate(date.slice(0, 7) === today.slice(0, 7) && data.mode === "monthly" ? null : date)} />
     <section aria-label="예산 현황" className="flex flex-col gap-5 border-b border-black-010 pb-6">
       <div className="flex flex-col gap-1"><p className="text-sm leading-150 text-black-030">{summary.remaining < 0 ? "예산 초과 금액" : "남은 예산"}</p><p className="font-numbers break-all text-4xl leading-130">{formatMoney(Math.abs(summary.remaining))}<span className="text-xl">원</span></p></div>
       <div className="flex flex-col gap-2"><div role="progressbar" aria-label="예산 사용률" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, summary.usedPercent)} aria-valuetext={`${summary.usedPercent}% 사용`} className="flex h-1.5 overflow-hidden rounded-full bg-black-002"><span className="bg-black-100 transition-all" style={{ width: `${Math.min(100, summary.usedPercent)}%` }} /></div><div className="flex items-center justify-between gap-3 text-xs leading-150 text-black-030"><span>예산의 {summary.usedPercent}% 사용</span><span>{period.label}</span></div></div>

@@ -1,10 +1,11 @@
 "use client";
 
+import { PeriodPicker } from "@/components/ui/period-picker";
+
 import { MoneyRow } from "@/components/ui/money-row";
 
 import Link from "next/link";
 import { useState } from "react";
-import { FieldLabel, TextField } from "@/components/ui/form-field";
 import { ChevronRight } from "lucide-react";
 
 import { usePocket } from "@/components/providers/pocket-provider";
@@ -34,12 +35,7 @@ export function AnalysisPage() {
   const change = summary.spent - previousTotal;
   return <div className="flex w-full max-w-content flex-col gap-7">
     <ScreenTitle title="지출 분석" subtitle={`${period.label} · 기록한 지출 기준`} />
-    <div className="flex flex-col gap-2">
-      <FieldLabel htmlFor="analysis-month">조회할 달</FieldLabel>
-      <TextField id="analysis-month" type="month" value={month} max={currentMonth} onChange={(event) => {
-        if (event.target.value && event.target.value <= currentMonth) setSelectedMonth(event.target.value);
-      }} />
-    </div>
+    <PeriodPicker date={month + "-01"} maxDate={today} onChange={(date) => setSelectedMonth(date.slice(0, 7))} />
     <div className="flex items-center justify-between gap-3"><span className="text-sm leading-150 text-black-030">{period.scope} 지출</span><p className="font-numbers text-2xl leading-140">{formatMoney(summary.spent)}원</p></div>
     <div className="flex flex-col gap-2 rounded-xl border border-black-020 p-4 text-sm"><dl><MoneyRow label="일반 지출" amount={summary.regularSpent} /><MoneyRow label="고정 지출 · 별도" amount={summary.fixedSpent} /></dl><Link href="/finance" className="self-start rounded-xl border border-black-020 bg-black-002 px-3 py-2">고정 내역 관리</Link></div>
     <Link href="/finance" className="flex flex-col gap-2 rounded-xl border border-black-100 bg-black-002 p-4"><h2 className="font-semibold">할부·현금 흐름 분석 →</h2><dl><MoneyRow label="이달 할부" amount={flow.installmentMonth} /><MoneyRow label="카드 출금" amount={flow.dueThisMonth} /><MoneyRow label="이달 저축" amount={flow.savedMonth} /><MoneyRow label="월말 예상 잔액" amount={flow.balance} /><MoneyRow label="미수 정산" amount={flow.receivable} /></dl><p className="text-xs leading-160">할부는 생활 예산에서 제외합니다. 추가 소비는 약속과 향후 카드 출금을 확보한 {formatMoney(flow.recommendedLimit)}원 이내를 권합니다.</p></Link>
