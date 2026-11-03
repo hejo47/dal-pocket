@@ -20,6 +20,7 @@ function usePocketController() {
   const period = getPeriod(data.mode, data.weekStartsOn, today);
   const expenses = getPeriodExpenses(data.expenses, period);
   const summary = financeSummary(data, period);
+  const [dailyView, setDailyView] = useState(false);
   const [category, setCategory] = useState<Category | "전체">("전체");
   const [notice, setNotice] = useState<Notice>(null);
   const dismissNotice = useCallback(() => setNotice(null), []);
@@ -38,7 +39,9 @@ function usePocketController() {
   function notify(message: string, persisted = true) {
     setNotice({ message: persisted ? message : `${message} 브라우저 저장을 사용할 수 없어 새로고침하면 사라질 수 있습니다.` });
   }
-  function setMode(mode: BudgetMode) {
+  function setMode(mode: BudgetMode | "daily") {
+    setDailyView(mode === "daily");
+    if (mode === "daily") return;
     updatePocket((current) => ({ ...current, mode }), { sync: false });
   }
   function saveFinance(finance: Finance) {
@@ -130,7 +133,7 @@ function usePocketController() {
     notify("선택한 서체를 적용했습니다.", persisted);
   }
 
-  return { data, today, ready, storage, retryCloud, loadServerCopy, period, expenses, summary, category, setCategory, setMode,
+  return { data, today, ready, storage, retryCloud, loadServerCopy, period, expenses, summary, category, setCategory, dailyView, setMode,
     saveBudget, saveMonthlyBudget, saveFinance, addCategory, deleteCategory, notice, dismissNotice, editor, openEditor, closeEditor,
     updateDraft, saveExpense, deleteExpense, restoreEditorFocus, startOwnRecords, saveFonts };
 }

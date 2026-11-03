@@ -19,13 +19,11 @@ import { formatMoney, getPeriod, getPeriodExpenses, shortDate, sumExpenses } fro
 
 export function HomePage() {
   const pocket = usePocket();
-  const [dailyView, setDailyView] = useState(false);
   const [viewDate, setViewDate] = useState<string | null>(null);
   const [visibleExpenses, setVisibleExpenses] = useState({ period: "", count: 8 });
   if (!pocket.ready) return <PageSkeleton />;
-  const { data, today } = pocket;
+  const { data, today, dailyView } = pocket;
   const selectedDate = viewDate ?? today;
-  const viewToggle = <PillButton type="button" variant="outline" size="sm" aria-pressed={dailyView} onClick={() => setDailyView(!dailyView)}>{dailyView ? (data.mode === "weekly" ? "주간 보기" : "월간 보기") : "1일 보기"}</PillButton>;
   if (dailyView) {
     const day = { start: selectedDate, end: selectedDate };
     const week = getPeriod("weekly", data.weekStartsOn, selectedDate);
@@ -35,7 +33,7 @@ export function HomePage() {
     const remaining = budget - spent;
 
     return <div className="flex w-full max-w-content flex-col gap-6">
-      <ScreenTitle title="1일 예산" subtitle={shortDate(selectedDate)} action={viewToggle} />
+      <ScreenTitle title="1일 예산" subtitle={shortDate(selectedDate)} />
       <PeriodPicker mode="daily" date={selectedDate} maxDate={today} onChange={setViewDate} />
       <section className="rounded-xl border border-black-010 p-4" aria-label="일간 예산 현황">
         <dl>
@@ -62,7 +60,6 @@ export function HomePage() {
   const periodLabel = `${Number(period.start.slice(5, 7))}월 ${period.weekNumber}주`;
   return <div className="flex w-full max-w-content flex-col gap-7">
     <ScreenTitle title={data.mode === "weekly" ? `${periodLabel} 예산` : `${Number(selectedDate.slice(5, 7))}월 예산`} subtitle={`${shortDate(period.start)}–${shortDate(period.end)}`} action={<Link href="/budget" className="rounded-lg border border-black-020 bg-white px-3 py-2 text-xs leading-150">예산 수정</Link>} />
-    <div className="self-end">{viewToggle}</div>
     <PeriodPicker mode={data.mode} date={selectedDate} maxDate={today} weekStartsOn={data.weekStartsOn} onChange={(date) => setViewDate(date.slice(0, 7) === today.slice(0, 7) && data.mode === "monthly" ? null : date)} />
     <section aria-label="예산 현황" className="flex flex-col gap-5 border-b border-black-010 pb-6">
       <div className="flex flex-col gap-1"><p className="text-sm leading-150 text-black-030">{summary.remaining < 0 ? "예산 초과 금액" : "남은 예산"}</p><p className="font-numbers break-all text-4xl leading-130">{formatMoney(Math.abs(summary.remaining))}<span className="text-xl">원</span></p></div>
@@ -76,7 +73,7 @@ export function HomePage() {
     </section>
     <section aria-label="지출과 예산 조정" className="flex flex-col gap-4 rounded-xl border border-black-010 p-4">
       <h2 className="text-base font-semibold">지출과 예산 조정</h2>
-      <dl><MoneyRow label="일반 지출" amount={summary.regularSpent} /><MoneyRow label="고정 지출 · 생활 예산과 별도" amount={summary.fixedSpent} /><MoneyRow label="카드값 · 받은 정산 차감" amount={cardBill} /><MoneyRow label="카드 출금 합계" amount={dueThisMonth} /><MoneyRow label="약속 확보액" amount={summary.reserved} /></dl>
+      <dl><MoneyRow label="일반 지출" amount={summary.regularSpent} /><MoneyRow label="고정 지출" amount={summary.fixedSpent} /><MoneyRow label="카드값 · 받은 정산 차감" amount={cardBill} /><MoneyRow label="카드 출금 합계" amount={dueThisMonth} /><MoneyRow label="약속 예산" amount={summary.reserved} /></dl>
       <p className="text-xs leading-160 text-black-030">{Number(selectedDate.slice(5, 7))}월 출금 기준이에요. 카드 출금 합계에는 정산 차감 전 결제액과 카드 고정비가 들어가요.</p>
       <details className="rounded-lg bg-black-002 px-3 py-2"><summary className="cursor-pointer py-1 text-sm font-semibold">이전 주 이월·차감</summary><dl><MoneyRow label="미사용액 가산" amount={summary.carriedIn} /><MoneyRow label="초과 지출 차감" amount={summary.carried} /></dl></details>
       <Link href={{ pathname: "/finance", query: { month: selectedDate.slice(0, 7) } }} className="flex items-center justify-between gap-3 rounded-lg bg-black-100 px-4 py-3 text-sm font-semibold text-white"><span>현금 흐름 관리</span><IconContainer size="sm"><ChevronRight /></IconContainer></Link>
