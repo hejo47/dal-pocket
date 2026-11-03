@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
       if (type === "installments") finance.installments = [...entries.values()].filter((item): item is import("@/lib/finance").Installment => "months" in item);
       else finance[type] = [...entries.values()];
     }
+    finance.noSpendDates = [...new Set(financialSources.flatMap((item) => item.noSpendDates ?? []))].sort().slice(-10000);
     finance.savings = [...new Map(financialSources.flatMap((item) => item.savings ?? []).map((item) => [item.id, item])).values()];
     finance.fixedExpenses = [...new Map(financialSources.flatMap((item) => item.fixedExpenses ?? []).map((item) => [item.id, item])).values()];
     const merged = {
