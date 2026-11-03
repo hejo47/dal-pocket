@@ -8,7 +8,7 @@ import { usePocket } from "@/components/providers/pocket-provider";
 import { FieldLabel, FieldHint, TextField, SelectField } from "@/components/ui/form-field";
 import { PillButton } from "@/components/ui/pill-button";
 import { ScreenTitle, PageSkeleton } from "@/components/ui/screen-title";
-import { financeOf, cashFlow, installmentDue } from "@/lib/finance";
+import { financeOf, cashFlow, installmentDue, nextMonth } from "@/lib/finance";
 import type { Finance, Installment } from "@/lib/finance";
 import { formatMoney, parseAmount, validAmount } from "@/lib/pocket";
 function FinanceView() {
@@ -18,6 +18,8 @@ function FinanceView() {
  const [balance,setBalance] = useState(String(finance.openingBalance)); const [openingDate,setOpeningDate] = useState(finance.openingDate === "2000-01-01" ? pocket.today : finance.openingDate);
  const [billingDay,setBillingDay] = useState(String(finance.billingDay)); const [closingDay,setClosingDay] = useState(String(finance.closingDay ?? 31)); const [billingOffset,setBillingOffset] = useState(String(finance.billingOffset ?? 1));
  const flow = cashFlow(pocket.data,month);
+ const followingMonth = nextMonth(month);
+ const nextInstallment = finance.installments.reduce((sum, item) => sum + installmentDue(item, followingMonth), 0);
  function save(next: Finance) { pocket.saveFinance(next); }
  return <div className="flex w-full min-w-0 max-w-content flex-col gap-6"><ScreenTitle title="현금 흐름·예정 지출" subtitle="수입, 카드 출금, 할부, 정산을 반영한 월말 예상 잔액" />
  <TextField aria-label="조회할 달" type="month" value={month} onChange={(event)=>{if(event.target.value)setMonth(event.target.value);}} />
@@ -25,7 +27,7 @@ function FinanceView() {
  <section className="flex flex-col gap-3 rounded-xl border border-black-100 bg-black-002 p-4"><h2 className="font-semibold">{month} 월말 예상 현금 잔액</h2>{finance.openingDate === "2000-01-01" && <p className="text-xs text-red-2">아래 현금·카드 설정에서 시작 잔액과 기준일을 먼저 저장해주세요.</p>}{finance.openingDate !== "2000-01-01" && (finance.openingDate.slice(0, 7) <= month ? <>
    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1"><p className={"font-numbers text-3xl " + (flow.balance < 0 ? "text-red-2" : "text-black-100")}>{formatMoney(flow.balance)}원</p><span className="font-numbers text-xs text-black-030">미수금 {formatMoney(flow.receivable)}원</span></div>
    <p className="text-sm leading-160 text-black-030">{finance.openingDate}의 시작 잔액부터 {month} 말일까지 계산합니다. 등록한 수입과 받은 정산을 더하고, 현금 결제·카드 출금·할부·현금 고정비·순저축을 뺍니다.</p>
- </> : <p className="text-sm leading-160 text-black-030">현금 계산 시작일({finance.openingDate}) 이전 달은 잔액을 계산하지 않습니다.</p>)}<dl><MoneyRow label="이달 일반 지출" amount={flow.monthSpent} /><MoneyRow label="이달 고정 지출 · 별도" amount={flow.fixedMonth} /><MoneyRow label="계산 기간 내 고정 출금" amount={flow.fixedCashOut} /><MoneyRow label="카드값" amount={flow.cardBill} /><MoneyRow label="이달 카드 출금 합계" amount={flow.dueThisMonth} /><MoneyRow label="이달 할부 납부" amount={flow.installmentMonth} /><MoneyRow label="남은 할부 원금" amount={flow.installmentOutstanding} /></dl>
+ </> : <p className="text-sm leading-160 text-black-030">현금 계산 시작일({finance.openingDate}) 이전 달은 잔액을 계산하지 않습니다.</p>)}<dl><MoneyRow label="이달 일반 지출" amount={flow.monthSpent} /><MoneyRow label="이달 고정 지출 · 별도" amount={flow.fixedMonth} /><MoneyRow label="계산 기간 내 고정 출금" amount={flow.fixedCashOut} /><MoneyRow label="카드값" amount={flow.cardBill} /><MoneyRow label="이달 카드 출금 합계" amount={flow.dueThisMonth} /><MoneyRow label="이달 할부 납부" amount={flow.installmentMonth} /><MoneyRow label="다음 달 할부 납부" amount={nextInstallment} /><MoneyRow label="남은 할부 원금" amount={flow.installmentOutstanding} /></dl>
  <p className="text-sm leading-160 text-black-030">카드 출금 합계는 고정비를 포함한 출금 예정 원금입니다. 정산금은 카드값에서 빼지 않으며, 실제 받은 금액만 현금 잔액에 더합니다. 할부 납부액은 별도로 표시합니다.</p></section>
  <div id="fixed-costs" className="scroll-mt-4"><FixedExpenses month={month} /></div>
  <div id="savings" className="scroll-mt-4"><SavingsSection month={month} /></div>
