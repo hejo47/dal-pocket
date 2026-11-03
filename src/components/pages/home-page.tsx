@@ -15,7 +15,7 @@ import { PageSkeleton, ScreenTitle } from "@/components/ui/screen-title";
 import { PillButton } from "@/components/ui/pill-button";
 import { IconContainer } from "@/components/ui/icon-container";
 
-import { allocatedBudget, cashFlow, financeOf, financeSummary, fixedTotal, foodBudgetSummary } from "@/lib/finance";
+import { allocatedBudget, cashFlow, financeSummary, foodBudgetSummary } from "@/lib/finance";
 import { formatMoney, getPeriod, getPeriodExpenses, shortDate, sumExpenses } from "@/lib/pocket";
 
 export function HomePage() {
@@ -29,24 +29,20 @@ export function HomePage() {
   const editBudget = <PillButton href={budgetHref} variant="outline" size="sm">예산 수정</PillButton>;
   const period = getPeriod(data.mode, data.weekStartsOn, selectedDate);
   const summary = financeSummary(data, period);
-  const { cardBill, dueThisMonth } = cashFlow(data, selectedDate.slice(0, 7));
+  const month = selectedDate.slice(0, 7);
+  const selectedMonth = Number(month.slice(5));
+  const { cardBill, dueThisMonth, monthSpent, fixedMonth, planned } = cashFlow(data, month);
   const day = { start: selectedDate, end: selectedDate };
   const dayExpenses = dailyView ? getPeriodExpenses(data.expenses, day) : [];
-  const regularSpent = dailyView ? sumExpenses(dayExpenses) : summary.regularSpent;
-  const fixedSpent = dailyView ? fixedTotal(data, selectedDate, selectedDate) : summary.fixedSpent;
-  const reserved = dailyView
-    ? financeOf(data).plans.filter((entry) => entry.date === selectedDate).reduce((total, entry) => total + entry.amount, 0)
-    : summary.reserved;
   const adjustments =
-    <section aria-label="지출과 예산 조정" className="flex flex-col gap-4 rounded-xl border border-black-010 p-4">
-      <h2 className="text-base font-semibold">지출과 예산 조정</h2>
-      <dl><MoneyRow label="일반 지출" amount={regularSpent} /><MoneyRow label="고정 지출" amount={fixedSpent} /><MoneyRow label="카드값 · 받은 정산 차감" amount={cardBill} /><MoneyRow label="카드 출금 합계" amount={dueThisMonth} /><MoneyRow label="약속 예산" amount={reserved} /></dl>
-      <p className="text-xs leading-160 text-black-030">{Number(selectedDate.slice(5, 7))}월 출금 기준이에요. 카드 출금 합계에는 정산 차감 전 결제액과 카드 고정비가 들어가요.</p>
-      {!dailyView && <details className="rounded-lg bg-black-002 px-3 py-2"><summary className="cursor-pointer py-1 text-sm font-semibold">이전 주 이월·차감</summary><dl><MoneyRow label="미사용액 가산" amount={summary.carriedIn} /><MoneyRow label="초과 지출 차감" amount={summary.carried} /></dl></details>}
-      <Link href={{ pathname: "/finance", query: { month: selectedDate.slice(0, 7) } }} className="flex items-center justify-between gap-3 rounded-lg bg-black-100 px-4 py-3 text-sm font-semibold text-white"><span>현금 흐름 관리</span><IconContainer size="sm"><ChevronRight /></IconContainer></Link>
+    <section aria-label={`${selectedMonth}월 지출과 예산 조정`} className="flex flex-col gap-4 rounded-xl border border-black-010 p-4">
+      <h2 className="text-base font-semibold">{selectedMonth}월 지출과 예산 조정</h2>
+      <dl><MoneyRow label="일반 지출" amount={monthSpent} /><MoneyRow label="고정 지출" amount={fixedMonth} /><MoneyRow label="카드값 · 받은 정산 차감" amount={cardBill} /><MoneyRow label="카드 출금 합계" amount={dueThisMonth} /><MoneyRow label="약속 예산" amount={planned} /></dl>
+      <p className="text-xs leading-160 text-black-030">카드값과 카드 출금 합계는 {selectedMonth}월 출금 기준이에요. 카드 출금 합계에는 정산 차감 전 결제액과 카드 고정비가 들어가요.</p>
+      <Link href={{ pathname: "/finance", query: { month } }} className="flex items-center justify-between gap-3 rounded-lg bg-black-100 px-4 py-3 text-sm font-semibold text-white"><span>현금 흐름 관리</span><IconContainer size="sm"><ChevronRight /></IconContainer></Link>
     </section>;
   const budget = dailyView ? allocatedBudget(data, { ...period, mode: "weekly", ...day }) : summary.budget;
-  const spent = dailyView ? regularSpent : summary.spent;
+  const spent = dailyView ? sumExpenses(dayExpenses) : summary.spent;
   const remaining = budget - spent;
   const usedPercent = dailyView ? (budget > 0 ? Math.round(spent * 100 / budget) : 0) : summary.usedPercent;
   const food = foodBudgetSummary(data, period);
@@ -54,7 +50,6 @@ export function HomePage() {
   const periodExpenses = dailyView ? dayExpenses : getPeriodExpenses(data.expenses, period);
   const periodKey = dailyView ? selectedDate : period.start + ":" + period.end;
   const visibleCount = visibleExpenses.period === periodKey ? visibleExpenses.count : 8;
-  const selectedMonth = Number(selectedDate.slice(5, 7));
   const selectedDay = Number(selectedDate.slice(8, 10));
   const budgetTitle = dailyView
     ? `${selectedMonth}월 ${selectedDay}일 예산`
@@ -69,6 +64,7 @@ export function HomePage() {
       <div className="flex flex-col gap-1"><p className="text-sm leading-150 text-black-030">{remaining < 0 ? "예산 초과 금액" : "남은 예산"}</p><p className="font-numbers break-all text-4xl leading-130">{formatMoney(Math.abs(remaining))}<span className="text-xl">원</span></p></div>
       <div className="flex flex-col gap-2"><div role="progressbar" aria-label="예산 사용률" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, usedPercent)} aria-valuetext={`${usedPercent}% 사용`} className="flex h-1.5 overflow-hidden rounded-full bg-black-002"><span className="bg-black-100 transition-all" style={{ width: `${Math.min(100, usedPercent)}%` }} /></div><div className="flex items-center justify-between gap-3 text-xs leading-150 text-black-030"><span>예산의 {usedPercent}% 사용</span><span>{dailyView ? shortDate(selectedDate) : period.label}</span></div></div>
       <dl className="flex flex-wrap gap-3"><div className="flex min-w-0 flex-1 flex-col gap-2 rounded-lg bg-black-002 px-4 py-4"><dt className="text-xs leading-150 text-black-030">사용한 금액</dt><dd className="font-numbers break-all text-xl font-semibold leading-140 text-black-100">{formatMoney(spent)}<span className="text-sm">원</span></dd></div><div className="flex min-w-0 flex-1 flex-col gap-2 rounded-lg bg-black-002 px-4 py-4"><dt className="text-xs leading-150 text-black-030">{dailyView ? "일간" : data.mode === "weekly" ? "주간" : "월간"} 예산</dt><dd className="font-numbers break-all text-xl font-semibold leading-140 text-black-100">{formatMoney(budget)}<span className="text-sm">원</span></dd></div></dl>
+      {!dailyView && data.mode === "weekly" && (summary.carriedIn > 0 || summary.carried > 0) && <details className="rounded-lg bg-black-002 px-3 py-2"><summary className="cursor-pointer py-1 text-sm font-semibold">이전 주 이월·차감</summary><dl><MoneyRow label="미사용액 가산" amount={summary.carriedIn} /><MoneyRow label="초과 지출 차감" amount={summary.carried} /></dl></details>}
       <HomePlans key={selectedDate} date={selectedDate} />
     </section>
     {!dailyView && <section aria-label="하루 사용 가능액" className="flex flex-col gap-4 rounded-xl border border-black-010 p-4">
