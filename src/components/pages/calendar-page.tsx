@@ -33,7 +33,6 @@ function CalendarView() {
       setMonth(next);
       setSelected(next === pocket.today.slice(0, 7) ? pocket.today : date);
     }} />
-    <div className="flex items-center justify-between gap-3 rounded-lg bg-black-002 p-4"><div className="flex flex-col gap-1"><p className="text-xs leading-150 text-black-030">이달 사용 금액</p><p className="font-numbers text-2xl leading-140">{formatMoney(calendar.total)}원</p></div><p className="font-numbers text-xs leading-150 text-black-030">{calendar.recordedDays}일 기록</p></div>
     <section aria-label={`${monthLabel} 날짜별 지출`} className="flex flex-col gap-4 rounded-xl border border-black-010 bg-black-002 p-3 sm:p-4">
       <div className="grid grid-cols-7 gap-1">{weekdays.map((day) => <span key={day} className="pb-2 text-center text-xs leading-150 text-black-030">{day.slice(0, 1)}</span>)}</div>
       {calendar.weeks.map((week) => <div key={week.number} className="flex flex-col gap-2">
@@ -43,7 +42,7 @@ function CalendarView() {
           {financeOf(pocket.data).plans.some((plan)=>plan.date===day.date) && <span className="text-calendar leading-150">예정</span>}
           {day.count > 0 && <span aria-hidden="true" className={cn("size-1 rounded-full", selected === day.date ? "bg-white" : "bg-black-100")} />}
         </PillButton> : <span key={day.date} aria-hidden="true" />)}</div>
-        <div className="flex flex-wrap items-center justify-between gap-1 rounded-md border border-black-010 bg-white px-3 py-2 text-calendar leading-150"><span className="text-black-030">{week.number}주 · {week.period.totalDays}일</span><span className="font-numbers">{formatMoney(week.spent)} / {formatMoney(financeSummary(pocket.data, week.period).budget)}원</span></div>
+        <div className="flex flex-wrap items-center justify-between gap-1 rounded-md border border-black-010 bg-white px-3 py-2 text-xs leading-150"><span className="font-semibold">{week.number}주차 예산</span><span className="font-numbers font-semibold">{formatMoney(financeSummary(pocket.data, week.period).budget)}원</span></div>
       </div>)}
       <p className="text-xs leading-160 text-black-030">날짜를 누르면 내역을 볼 수 있습니다. 각 주의 예산은 해당 월 예산에서 배분하고 이전 초과 지출을 차감합니다.</p>
     </section>
