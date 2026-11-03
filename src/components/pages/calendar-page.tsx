@@ -44,7 +44,7 @@ function CalendarView() {
           {day.count > 0 && <span aria-hidden="true" className={cn("size-1 rounded-full", selected === day.date ? "bg-white" : "bg-black-100")} />}
         </PillButton> : <span key={day.date} aria-hidden="true" />)}</div>
       </div>)}
-      <p className="text-xs leading-160 text-black-030">날짜를 누르면 내역을 볼 수 있습니다. 각 주의 예산은 해당 월 예산에서 배분하고 이전 초과 지출을 차감합니다.</p>
+      <p className="text-xs leading-160 text-black-030">날짜를 누르면 내역을 볼 수 있습니다. 각 주에는 해당 날짜에 배정된 기본 예산이 표시됩니다.</p>
     </section>
     <section className="flex flex-col gap-3" aria-label="선택한 날짜의 지출">
       <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-base leading-150">{shortDate(selected)} 지출</h2><PillButton variant="outline" size="sm" disabled={selected > pocket.today} onClick={() => pocket.openEditor(undefined, selected)}><IconContainer size="sm"><Plus /></IconContainer>이 날짜에 추가</PillButton></div>
