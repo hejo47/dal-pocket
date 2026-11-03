@@ -55,7 +55,8 @@ export function HomePage() {
     </section>
     <section aria-label="지출과 예산 조정" className="flex flex-col gap-4 rounded-xl border border-black-010 p-4">
       <h2 className="text-base font-semibold">지출과 예산 조정</h2>
-      <dl><MoneyRow label="일반 지출" amount={summary.regularSpent} /><MoneyRow label="고정 지출 · 생활 예산과 별도" amount={summary.fixedSpent} /><MoneyRow label="카드값" amount={cardBill} /><MoneyRow label="약속 확보액" amount={summary.reserved} /></dl>
+      <dl><MoneyRow label="일반 지출" amount={summary.regularSpent} /><MoneyRow label="고정 지출 · 생활 예산과 별도" amount={summary.fixedSpent} /><MoneyRow label="카드값 · 고정비 제외" amount={cardBill} /><MoneyRow label="약속 확보액" amount={summary.reserved} /></dl>
+      <p className="text-xs leading-160 text-black-030">{Number(selectedDate.slice(5, 7))}월에 출금되는 카드값이에요. 위 일반 지출 합계에는 더하지 않아요.</p>
       <details className="rounded-lg bg-black-002 px-3 py-2"><summary className="cursor-pointer py-1 text-sm font-semibold">이전 주 이월·차감</summary><dl><MoneyRow label="미사용액 가산" amount={summary.carriedIn} /><MoneyRow label="초과 지출 차감" amount={summary.carried} /></dl></details>
       <Link href={{ pathname: "/finance", query: { month: selectedDate.slice(0, 7) } }} className="flex items-center justify-between gap-3 rounded-lg bg-black-100 px-4 py-3 text-sm font-semibold text-white"><span>현금 흐름 관리</span><IconContainer size="sm"><ChevronRight /></IconContainer></Link>
     </section>
