@@ -14,16 +14,43 @@ import { PageSkeleton, ScreenTitle } from "@/components/ui/screen-title";
 import { PillButton } from "@/components/ui/pill-button";
 import { IconContainer } from "@/components/ui/icon-container";
 
-import { cashFlow, financeSummary, foodBudgetSummary } from "@/lib/finance";
+import { allocatedBudget, cashFlow, financeSummary, foodBudgetSummary } from "@/lib/finance";
 import { formatMoney, getPeriod, getPeriodExpenses, shortDate, sumExpenses } from "@/lib/pocket";
 
 export function HomePage() {
   const pocket = usePocket();
+  const [dailyView, setDailyView] = useState(false);
   const [viewDate, setViewDate] = useState<string | null>(null);
   const [visibleExpenses, setVisibleExpenses] = useState({ period: "", count: 8 });
   if (!pocket.ready) return <PageSkeleton />;
   const { data, today } = pocket;
   const selectedDate = viewDate ?? today;
+  const viewToggle = <PillButton type="button" variant="outline" size="sm" aria-pressed={dailyView} onClick={() => setDailyView(!dailyView)}>{dailyView ? (data.mode === "weekly" ? "주간 보기" : "월간 보기") : "1일 보기"}</PillButton>;
+  if (dailyView) {
+    const day = { start: selectedDate, end: selectedDate };
+    const week = getPeriod("weekly", data.weekStartsOn, selectedDate);
+    const budget = allocatedBudget(data, { ...week, ...day });
+    const expenses = getPeriodExpenses(data.expenses, day);
+    const spent = sumExpenses(expenses);
+    const remaining = budget - spent;
+
+    return <div className="flex w-full max-w-content flex-col gap-6">
+      <ScreenTitle title="1일 예산" subtitle={shortDate(selectedDate)} action={viewToggle} />
+      <PeriodPicker mode="daily" date={selectedDate} maxDate={today} onChange={setViewDate} />
+      <section className="rounded-xl border border-black-010 p-4" aria-label="일간 예산 현황">
+        <dl>
+          <MoneyRow label="하루 배정 예산" amount={budget} />
+          <MoneyRow label="사용한 금액" amount={spent} />
+          <MoneyRow label={remaining < 0 ? "예산 초과" : "남은 예산"} amount={Math.abs(remaining)} />
+        </dl>
+        <p className="text-xs leading-160 text-black-030">월 예산을 해당 월의 날짜 수로 나눈 하루 배정액이에요.</p>
+      </section>
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold">이날 지출 내역</h2>
+        <ExpenseList expenses={expenses} />
+      </section>
+    </div>;
+  }
   const period = getPeriod(data.mode, data.weekStartsOn, selectedDate);
   const summary = financeSummary(data, period);
   const { cardBill, dueThisMonth } = cashFlow(data, selectedDate.slice(0, 7));
@@ -35,6 +62,7 @@ export function HomePage() {
   const periodLabel = `${Number(period.start.slice(5, 7))}월 ${period.weekNumber}주`;
   return <div className="flex w-full max-w-content flex-col gap-7">
     <ScreenTitle title={data.mode === "weekly" ? `${periodLabel} 예산` : `${Number(selectedDate.slice(5, 7))}월 예산`} subtitle={`${shortDate(period.start)}–${shortDate(period.end)}`} action={<Link href="/budget" className="rounded-lg border border-black-020 bg-white px-3 py-2 text-xs leading-150">예산 수정</Link>} />
+    <div className="self-end">{viewToggle}</div>
     <PeriodPicker mode={data.mode} date={selectedDate} maxDate={today} weekStartsOn={data.weekStartsOn} onChange={(date) => setViewDate(date.slice(0, 7) === today.slice(0, 7) && data.mode === "monthly" ? null : date)} />
     <section aria-label="예산 현황" className="flex flex-col gap-5 border-b border-black-010 pb-6">
       <div className="flex flex-col gap-1"><p className="text-sm leading-150 text-black-030">{summary.remaining < 0 ? "예산 초과 금액" : "남은 예산"}</p><p className="font-numbers break-all text-4xl leading-130">{formatMoney(Math.abs(summary.remaining))}<span className="text-xl">원</span></p></div>
