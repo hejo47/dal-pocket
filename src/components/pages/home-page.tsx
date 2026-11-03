@@ -54,16 +54,23 @@ export function HomePage() {
   const periodExpenses = dailyView ? dayExpenses : getPeriodExpenses(data.expenses, period);
   const periodKey = dailyView ? selectedDate : period.start + ":" + period.end;
   const visibleCount = visibleExpenses.period === periodKey ? visibleExpenses.count : 8;
-  const periodLabel = `${Number(period.start.slice(5, 7))}월 ${period.weekNumber}주`;
+  const selectedMonth = Number(selectedDate.slice(5, 7));
+  const selectedDay = Number(selectedDate.slice(8, 10));
+  const budgetTitle = dailyView
+    ? `${selectedMonth}월 ${selectedDay}일 예산`
+    : data.mode === "weekly"
+      ? `${selectedMonth}월 ${period.weekNumber}주차 예산`
+      : `${selectedMonth}월 예산`;
+
   return <div className="flex w-full max-w-content flex-col gap-7">
-    <ScreenTitle title={dailyView ? "1일 예산" : data.mode === "weekly" ? `${periodLabel} 예산` : `${Number(selectedDate.slice(5, 7))}월 예산`} subtitle={dailyView ? shortDate(selectedDate) : `${shortDate(period.start)}–${shortDate(period.end)}`} action={editBudget} />
+    <ScreenTitle title={budgetTitle} subtitle={dailyView ? undefined : period.label} action={editBudget} />
     <PeriodPicker mode={dailyView ? "daily" : data.mode} date={selectedDate} maxDate={today} weekStartsOn={data.weekStartsOn} onChange={(date) => setViewDate(date.slice(0, 7) === today.slice(0, 7) && !dailyView && data.mode === "monthly" ? null : date)} />
     <section aria-label="예산 현황" className="flex flex-col gap-5 border-b border-black-010 pb-6">
       <div className="flex flex-col gap-1"><p className="text-sm leading-150 text-black-030">{remaining < 0 ? "예산 초과 금액" : "남은 예산"}</p><p className="font-numbers break-all text-4xl leading-130">{formatMoney(Math.abs(remaining))}<span className="text-xl">원</span></p></div>
       <div className="flex flex-col gap-2"><div role="progressbar" aria-label="예산 사용률" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, usedPercent)} aria-valuetext={`${usedPercent}% 사용`} className="flex h-1.5 overflow-hidden rounded-full bg-black-002"><span className="bg-black-100 transition-all" style={{ width: `${Math.min(100, usedPercent)}%` }} /></div><div className="flex items-center justify-between gap-3 text-xs leading-150 text-black-030"><span>예산의 {usedPercent}% 사용</span><span>{dailyView ? shortDate(selectedDate) : period.label}</span></div></div>
       <dl className="flex flex-wrap gap-3"><div className="flex min-w-0 flex-1 flex-col gap-2 rounded-lg bg-black-002 px-4 py-4"><dt className="text-xs leading-150 text-black-030">사용한 금액</dt><dd className="font-numbers break-all text-xl font-semibold leading-140 text-black-100">{formatMoney(spent)}<span className="text-sm">원</span></dd></div><div className="flex min-w-0 flex-1 flex-col gap-2 rounded-lg bg-black-002 px-4 py-4"><dt className="text-xs leading-150 text-black-030">{dailyView ? "일간" : data.mode === "weekly" ? "주간" : "월간"} 예산</dt><dd className="font-numbers break-all text-xl font-semibold leading-140 text-black-100">{formatMoney(budget)}<span className="text-sm">원</span></dd></div></dl>
+      <HomePlans key={selectedDate} date={selectedDate} />
     </section>
-    <HomePlans key={selectedDate} date={selectedDate} />
     {!dailyView && <section aria-label="하루 사용 가능액" className="flex flex-col gap-4 rounded-xl border border-black-020 p-4">
       <div className="flex items-center justify-between gap-3"><h2 className="text-sm leading-150">하루 사용 가능액</h2><p className="font-numbers text-xl font-semibold leading-140">{formatMoney(dailyBudget)}원</p></div>
       <p className="font-numbers text-xs leading-160 text-black-030">남은 예산 {formatMoney(summary.remaining)}원 ÷ {selectedDate === today ? "오늘 포함 " : "선택일 포함 "}{period.remainingDays}일</p>
