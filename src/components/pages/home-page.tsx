@@ -13,7 +13,7 @@ import { PillButton } from "@/components/ui/pill-button";
 import { DateField, FieldLabel } from "@/components/ui/form-field";
 import { IconContainer } from "@/components/ui/icon-container";
 
-import { financeSummary, foodBudgetSummary } from "@/lib/finance";
+import { cashFlow, financeSummary, foodBudgetSummary } from "@/lib/finance";
 import { formatMoney, getPeriod, getPeriodExpenses, offsetDate, shortDate, sumExpenses } from "@/lib/pocket";
 
 export function HomePage() {
@@ -26,6 +26,7 @@ export function HomePage() {
   const selectedDate = viewDate ?? today;
   const period = getPeriod(data.mode, data.weekStartsOn, selectedDate);
   const summary = financeSummary(data, period);
+  const { cardBill } = cashFlow(data, selectedDate.slice(0, 7));
   const food = foodBudgetSummary(data, period);
   const dailyBudget = Math.max(0, Math.floor(summary.remaining / period.remainingDays));
   const periodExpenses = getPeriodExpenses(data.expenses, period);
@@ -54,7 +55,7 @@ export function HomePage() {
     </section>
     <section aria-label="지출과 예산 조정" className="flex flex-col gap-4 rounded-xl border border-black-010 p-4">
       <h2 className="text-base font-semibold">지출과 예산 조정</h2>
-      <dl><MoneyRow label="일반 지출" amount={summary.regularSpent} /><MoneyRow label="고정 지출 · 생활 예산과 별도" amount={summary.fixedSpent} /><MoneyRow label="약속 확보액" amount={summary.reserved} /></dl>
+      <dl><MoneyRow label="일반 지출" amount={summary.regularSpent} /><MoneyRow label="고정 지출 · 생활 예산과 별도" amount={summary.fixedSpent} /><MoneyRow label="카드값" amount={cardBill} /><MoneyRow label="약속 확보액" amount={summary.reserved} /></dl>
       <details className="rounded-lg bg-black-002 px-3 py-2"><summary className="cursor-pointer py-1 text-sm font-semibold">이전 주 이월·차감</summary><dl><MoneyRow label="미사용액 가산" amount={summary.carriedIn} /><MoneyRow label="초과 지출 차감" amount={summary.carried} /></dl></details>
       <Link href="/finance" className="flex items-center justify-between gap-3 rounded-lg bg-black-100 px-4 py-3 text-sm font-semibold text-white"><span>현금 흐름 관리</span><IconContainer size="sm"><ChevronRight /></IconContainer></Link>
     </section>
