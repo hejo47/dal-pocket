@@ -87,6 +87,12 @@
 
 .icon-container > svg { display: block; width: 100%; height: 100%; }
 .pocket-dialog-scroll { scrollbar-gutter: stable; overscroll-behavior: contain; }
+.pocket-loading-recovery { animation: pocket-show-recovery 8s step-end both; }
+
+@keyframes pocket-show-recovery {
+  from { visibility: hidden; }
+  to { visibility: visible; }
+}
 
 input[type="date"], input[type="month"] {
   -webkit-appearance: none;
