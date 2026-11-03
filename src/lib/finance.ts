@@ -153,6 +153,7 @@ export function cashFlow(data: PocketData, month: string) {
   const end = getPeriod("monthly", 1, `${month}-01`).end;
   const inRange = (date: string) => date >= finance.openingDate && date <= end;
   let cashOut = 0, cardOut = 0, received = 0, receivable = 0, installments = 0, dueThisMonth = 0, futureCard = 0, installmentOutstanding = 0;
+  let cardSettlements = 0;
   for (const expense of data.expenses) {
     const payment = finance.payments[expense.id];
     const gross = payment?.gross ?? expense.amount;
@@ -170,9 +171,12 @@ export function cashFlow(data: PocketData, month: string) {
         if (inRange(receipt.date)) received += portion;
       }
       receivable += total - paidAsOfEnd;
+      if (payment.method === "card" && dueDate.slice(0, 7) === month) {
+        cardSettlements += settlementSummary(payment, expense.amount).receivedAmount;
+      }
     }
   }
-  const cardBill = dueThisMonth;
+  const cardBill = dueThisMonth - cardSettlements;
   let fixedCardOut = 0;
   for (const item of finance.fixedExpenses ?? []) {
     if (item.method !== "card") continue;
@@ -206,5 +210,5 @@ export function cashFlow(data: PocketData, month: string) {
   const savingsTransfer = savings.filter((item) => inRange(item.date)).reduce((sum,item) => sum + (item.direction === "deposit" ? item.amount : -item.amount), 0);
   const balance = finance.openingBalance + income + received - cashOut - cardOut - installments - fixedCashOut - savingsTransfer;
   const availableBalance = balance - futureCard - installmentOutstanding - planned;
-  return { savedMonth, withdrawnMonth, savingsBalance, savingsTransfer, fixedCashOut, fixedCardOut, fixedMonth, fixedOut, monthSpent, availableBalance, installmentOutstanding, futureCard, balance, income, cashOut, cardOut, received, receivable, installmentMonth, cardBill, dueThisMonth, planned, recommendedLimit: Math.max(0, Math.min(livingRemaining, availableBalance)) };
+  return { savedMonth, withdrawnMonth, savingsBalance, savingsTransfer, fixedCashOut, fixedCardOut, fixedMonth, fixedOut, monthSpent, availableBalance, installmentOutstanding, futureCard, balance, income, cashOut, cardOut, received, receivable, installmentMonth, cardBill, cardSettlements, dueThisMonth, planned, recommendedLimit: Math.max(0, Math.min(livingRemaining, availableBalance)) };
 }
