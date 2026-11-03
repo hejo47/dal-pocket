@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { CalendarDays, ChartNoAxesCombined, House, NotebookPen, Plus, UserRound, Wallet, WalletCards } from "lucide-react";
+import { CalendarDays, ChartNoAxesCombined, House, NotebookPen, Plus, UserRound, WalletCards } from "lucide-react";
 
 import { ExpenseEditor } from "@/components/pages/expense-editor";
 import { usePocket } from "@/components/providers/pocket-provider";
@@ -16,14 +16,15 @@ import { cn } from "@/lib/utils";
 const navigation = [
   { href: "/", label: "홈", icon: House }, { href: "/expenses", label: "내역", icon: NotebookPen },
   { href: "/calendar", label: "달력", icon: CalendarDays },
-  { href: "/analysis", label: "분석", icon: ChartNoAxesCombined }, { href: "/budget", label: "예산", icon: Wallet },
+  { href: "/analysis", label: "분석", icon: ChartNoAxesCombined },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const pocket = usePocket();
-  const modeOptions = pathname === "/" ? (["daily", "weekly", "monthly"] as const) : (["weekly", "monthly"] as const);
-  const activeMode = pathname === "/" && pocket.dailyView ? "daily" : pocket.data.mode;
+  const supportsDaily = pathname === "/" || pathname === "/budget";
+  const modeOptions = supportsDaily ? (["daily", "weekly", "monthly"] as const) : (["weekly", "monthly"] as const);
+  const activeMode = supportsDaily && pocket.dailyView ? "daily" : pocket.data.mode;
   const showAdd = pathname !== "/budget" && pathname !== "/calendar" && pathname !== "/finance" && pathname !== "/account";
   return <div className="mx-auto flex min-h-dvh w-full max-w-page flex-col border-x border-black-010 bg-white">
     <a href="#main-content" className="sr-only focus:not-sr-only focus:px-6 focus:py-3">본문 바로가기</a>

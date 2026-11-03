@@ -2,6 +2,7 @@
 
 import { PeriodPicker } from "@/components/ui/period-picker";
 
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { usePocket } from "@/components/providers/pocket-provider";
@@ -9,7 +10,7 @@ import { FieldHint, FieldLabel, SelectField, TextField } from "@/components/ui/f
 import { PillButton } from "@/components/ui/pill-button";
 import { PageSkeleton, ScreenTitle } from "@/components/ui/screen-title";
 import { monthDays, monthSettings } from "@/lib/finance";
-import { formatMoney, parseAmount, WEEKDAYS } from "@/lib/pocket";
+import { formatMoney, isDateKey, parseAmount, WEEKDAYS } from "@/lib/pocket";
 
 function BudgetForm({ month, daily }: { month: string; daily: boolean }) {
   const pocket = usePocket();
@@ -48,19 +49,21 @@ function BudgetForm({ month, daily }: { month: string; daily: boolean }) {
   </form>;
 }
 
-function BudgetView() {
+function BudgetView({ initialMonth }: { initialMonth: string }) {
   const pocket = usePocket();
-  const [daily, setDaily] = useState(false);
-  const [month, setMonth] = useState(pocket.today.slice(0, 7));
+  const daily = pocket.dailyView;
+  const [month, setMonth] = useState(initialMonth);
   const setting = monthSettings(pocket.data, month);
   return <div className="flex w-full min-w-0 max-w-content flex-col gap-5">
     <PeriodPicker date={month + "-01"} onChange={(date) => setMonth(date.slice(0, 7))} />
-    <ScreenTitle action={<PillButton type="button" variant="outline" size="sm" aria-pressed={daily} onClick={() => setDaily((value) => !value)}>{daily ? "기존 입력 방식" : "일간으로 입력"}</PillButton>} title={daily ? "일간 예산" : pocket.data.mode === "weekly" ? "주간 예산" : "월간 예산"} subtitle={daily ? "하루에 쓸 금액을 입력하세요" : pocket.data.mode === "weekly" ? "주당 금액을 입력하세요" : "월 총액을 주별로 나눠 편성합니다"} />
+    <ScreenTitle title={daily ? "일간 예산" : pocket.data.mode === "weekly" ? "주간 예산" : "월간 예산"} subtitle={daily ? "하루에 쓸 금액을 입력하세요" : pocket.data.mode === "weekly" ? "주당 금액을 입력하세요" : "월 총액을 주별로 나눠 편성합니다"} />
     <BudgetForm daily={daily} key={`${daily}-${month}-${pocket.data.mode}-${setting.budget}-${setting.groceries}`} month={month} />
   </div>;
 }
 
 export function BudgetPage() {
   const pocket = usePocket();
-  return pocket.ready ? <BudgetView /> : <PageSkeleton />;
+  const month = useSearchParams().get("month");
+  const initialMonth = month && isDateKey(month + "-01") ? month : pocket.today.slice(0, 7);
+  return pocket.ready ? <BudgetView key={initialMonth} initialMonth={initialMonth} /> : <PageSkeleton />;
 }
