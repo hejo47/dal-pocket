@@ -6,12 +6,12 @@ import type { VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border text-sm leading-150 transition-colors disabled:pointer-events-none disabled:opacity-40",
+  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border text-sm font-semibold leading-150 transition-colors disabled:pointer-events-none disabled:opacity-40 disabled:shadow-none",
   { variants: {
     variant: {
       default: "border-transparent bg-black-100 text-white hover:bg-black-030",
-      outline: "border-transparent bg-black-005 text-black-100 hover:bg-black-010",
-      ghost: "border-transparent bg-transparent text-black-100 hover:bg-black-005",
+      outline: "border-black-010 bg-white text-black-100 shadow-xs hover:bg-black-002 active:bg-black-005",
+      ghost: "border-transparent bg-transparent text-black-100 hover:bg-black-005 active:bg-black-010",
       link: "border-transparent text-black-100 underline underline-offset-4",
     },
     size: { default: "px-4 py-3", sm: "px-3 py-2", icon: "px-3 py-3" },
