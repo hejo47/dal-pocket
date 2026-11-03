@@ -18,7 +18,7 @@ export function SavingsSection({ month }: { month: string }) {
   const [memo, setMemo] = useState("");
   return <section className="flex min-w-0 flex-col gap-4 rounded-xl border border-black-020 p-4">
     <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">저축</h2><PillButton variant="outline" size="sm" aria-expanded={open} onClick={() => setOpen((value) => !value)}>{open ? "접기" : "저축 기록 추가"}</PillButton></div>
-    <p className="text-xs text-black-030">등록 기준 누적 저축 잔액 · 선택한 달 말일 기준</p><p className="font-numbers text-2xl">{formatMoney(flow.savingsBalance)}원</p>
+    {pocket.data.mode === "monthly" && <><p className="text-xs text-black-030">등록 기준 누적 저축 잔액 · 선택한 달 말일 기준</p><p className="font-numbers text-2xl">{formatMoney(flow.savingsBalance)}원</p></>}
     <div className="flex flex-col gap-1 text-sm"><p>이달 저축 {formatMoney(flow.savedMonth)}원</p><p>이달 인출 {formatMoney(flow.withdrawnMonth)}원</p></div>
     {open && <form className="flex min-w-0 flex-col gap-3 rounded-lg bg-black-002 p-3" onSubmit={(event) => {
       event.preventDefault(); const parsed = parseAmount(amount); if (!validAmount(parsed)) return;
