@@ -16,8 +16,11 @@ import { PageSkeleton, ScreenTitle } from "@/components/ui/screen-title";
 import { fixedTotal, financeOf, settlementSummary, unsettledExpenses } from "@/lib/finance";
 import { formatMoney, getPeriod, getPeriodExpenses, offsetDate, sumExpenses } from "@/lib/pocket";
 
+import { downloadSettlementPng } from "@/lib/settlement-png";
+
 export function ExpensesPage() {
   const pocket = usePocket();
+  const [exportError, setExportError] = useState(false);
   const [unsettledOnly, setUnsettledOnly] = useState(false);
   const [viewDate, setViewDate] = useState<string | null>(null);
   const [addingCategory, setAddingCategory] = useState(false);
@@ -32,7 +35,23 @@ export function ExpensesPage() {
     : getPeriod("monthly", pocket.data.weekStartsOn, viewDate ?? pocket.today);
   const periodExpenses = getPeriodExpenses(pocket.data.expenses, period);
   const filtered = unsettledOnly ? unsettledExpenses(pocket.data, pocket.category) : periodExpenses.filter((expense) => pocket.category === "전체" || expense.category === pocket.category);
-  const outstandingTotal = unsettledOnly ? filtered.reduce((sum,expense) => sum + settlementSummary(financeOf(pocket.data).payments[expense.id], expense.amount).outstanding, 0) : 0;
+  const payments = financeOf(pocket.data).payments;
+  const claimRows = unsettledOnly ? filtered.map((expense) => ({
+    date: expense.date,
+    title: expense.memo || expense.category,
+    amount: settlementSummary(payments[expense.id], expense.amount).outstanding,
+  })) : [];
+  const outstandingTotal = claimRows.reduce((sum, row) => sum + row.amount, 0);
+
+  async function exportClaims() {
+    setExportError(false);
+    try {
+      await downloadSettlementPng(claimRows, pocket.category, pocket.today);
+    } catch {
+      setExportError(true);
+    }
+  }
+
   function submitCategory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const name = categoryName.trim();
@@ -54,5 +73,9 @@ export function ExpensesPage() {
     </section>
     <Dialog open={categoryToDelete !== null} onOpenChange={(open) => { if (!open) setCategoryToDelete(null); }}><DialogContent><DialogHeader><DialogTitle>카테고리 삭제</DialogTitle><DialogDescription>{categoryToDelete && (pocket.data.expenses.filter((expense) => expense.category === categoryToDelete).length ? `이 카테고리의 지출 ${pocket.data.expenses.filter((expense) => expense.category === categoryToDelete).length}건을 아래 카테고리로 옮긴 뒤 삭제합니다.` : "이 카테고리를 목록에서 삭제합니다.")}</DialogDescription></DialogHeader>{categoryToDelete && pocket.data.expenses.some((expense) => expense.category === categoryToDelete) && <div className="flex flex-col gap-2"><FieldLabel htmlFor="replacement-category" required>기록을 옮길 카테고리</FieldLabel><SelectField id="replacement-category" value={replacementCategory} options={pocket.data.categories.filter((item) => item !== categoryToDelete).map((item) => ({ value: item, label: item }))} onChange={(event) => setReplacementCategory(event.target.value)} /></div>}<DialogFooter><ActionButtonRow buttons={[{ label: "취소", variant: "outline", onClick: () => setCategoryToDelete(null) }, { label: "삭제", disabled: !categoryToDelete, onClick: () => { if (categoryToDelete && pocket.deleteCategory(categoryToDelete, replacementCategory)) { setCategoryToDelete(null); setManagingCategories(false); } } }]} /></DialogFooter></DialogContent></Dialog>
     {unsettledOnly && !filtered.length ? <p className="rounded-xl bg-black-002 p-4 text-sm">이 카테고리의 미정산 내역이 없습니다.</p> : <ExpenseList expenses={filtered} grouped />}
+    {unsettledOnly && claimRows.length > 0 && <div className="flex flex-col gap-2">
+      <PillButton type="button" onClick={exportClaims}>미수금 내역 PNG 내려받기</PillButton>
+      {exportError && <p role="alert" className="text-sm text-red-2">이미지를 만들지 못했어요. 카테고리별로 나눠 다시 시도해주세요.</p>}
+    </div>}
   </div>;
 }
