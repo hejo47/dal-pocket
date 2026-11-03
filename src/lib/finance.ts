@@ -126,6 +126,19 @@ export function financeSummary(data: PocketData, period: Period) {
   const reserved = financeOf(data).plans.filter((plan) => plan.date >= period.start && plan.date <= period.end).reduce((sum, plan) => sum + plan.amount, 0);
   return { carriedIn, regularSpent, fixedSpent, budget, spent, remaining, carried, reserved, usedPercent: budget ? Math.round(spent / budget * 100) : spent ? 100 : 0, dailyAvailable: Math.max(0, Math.floor((remaining - reserved) / period.remainingDays)), dailyAverage: Math.floor(spent / period.elapsedDays) };
 }
+export function dailySpendingAllowance(data: PocketData, date: string) {
+  const week = getPeriod("weekly", data.weekStartsOn, date);
+  const { budget } = financeSummary(data, week);
+  const spent = sumExpenses(data.expenses.filter((expense) => expense.date >= week.start && expense.date <= date));
+  const fixed = fixedTotal(data, week.start, date, true);
+  const reserved = financeOf(data).plans
+    .filter((plan) => plan.date >= date && plan.date <= week.end)
+    .reduce((sum, plan) => sum + plan.amount, 0);
+  const remaining = budget - spent - fixed;
+  const available = Math.max(0, Math.floor((remaining - reserved) / week.remainingDays));
+  return { available, remaining, reserved, days: week.remainingDays };
+}
+
 export function nextMonth(month: string, offset = 1) { return new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)) - 1 + offset, 1)).toISOString().slice(0, 7); }
 export function installmentDue(item: Installment, month: string) {
   const index = (Number(month.slice(0, 4)) - Number(item.date.slice(0, 4))) * 12 + Number(month.slice(5)) - Number(item.date.slice(5, 7));

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createDemoData, getCalendarMonth, getPeriod, offsetDate } from "../src/lib/pocket.ts";
-import { allocatedBudget, cashFlow, settlementSummary, unsettledExpenses, resizeSettlements, fixedDueDate, fixedTotal, foodBudgetSummary, emptyFinance, financeSummary, installmentDue, isFinance, monthSettings } from "../src/lib/finance.ts";
+import { allocatedBudget, cashFlow, dailySpendingAllowance, settlementSummary, unsettledExpenses, resizeSettlements, fixedDueDate, fixedTotal, foodBudgetSummary, emptyFinance, financeSummary, installmentDue, isFinance, monthSettings } from "../src/lib/finance.ts";
 function data() { const value = createDemoData("2026-11-02"); value.expenses=[]; value.isDemo=false; value.finance={...emptyFinance(),months:{"2026-11":{budget:300000,groceries:30000}}}; return value; }
 test("월별 하나의 예산을 모든 짧은 주에 배분해도 합계가 동일하다",()=>{const value=data();const month=getCalendarMonth("2026-11",1,[]);assert.equal(month.weeks.reduce((sum,week)=>sum+allocatedBudget(value,week.period),0),300000);assert.equal(allocatedBudget(value,getPeriod("weekly",1,"2026-11-01")),10000);assert.equal(monthSettings(value,"2026-10").budget,0);});
 test("주 경계 이동이 월초 하루짜리 주를 건너뛰지 않는다",()=>{const october=getPeriod("weekly",1,"2026-10-31");const first=getPeriod("weekly",1,offsetDate(october.end,1));assert.equal(first.start,"2026-11-01");assert.equal(first.end,"2026-11-01");assert.equal(getPeriod("weekly",1,offsetDate(first.end,1)).start,"2026-11-02");});
@@ -28,3 +28,19 @@ test("부분 정산은 받은 인원별 금액과 날짜를 반영하고 카테�
 test("정산 반올림 잔여액을 보존하고 받은 인원이 상대 인원을 넘으면 저장 거부한다",()=>{const value=data();const payment={gross:101,split:3,method:"cash" as const,settled:false,settledDate:"2026-11-01",settlements:[{count:1,date:"2026-11-01"}]};assert.equal(settlementSummary(payment).receivedAmount,33);assert.equal(settlementSummary(payment).outstanding,34);payment.settlements.push({count:1,date:"2026-11-02"});assert.equal(settlementSummary(payment).receivedAmount,67);value.finance!.payments.p=payment;assert.ok(isFinance(value.finance));payment.settlements.push({count:1,date:"2026-11-03"});assert.equal(isFinance(value.finance),false);});
 
 test("정산 인원 선택을 바꾸면 추가 버튼 없이 새 기록이 생성되고 기존 수령일은 유지된다",()=>{const payment={gross:90000,split:3,method:"card" as const,settled:false,settledDate:"2026-11-01",settlements:[{count:1,date:"2026-11-01"}]};assert.deepEqual(resizeSettlements(payment,2,"2026-11-02"),[{count:1,date:"2026-11-01"},{count:1,date:"2026-11-02"}]);assert.deepEqual(resizeSettlements(payment,0,"2026-11-02"),[]);assert.equal(settlementSummary({...payment,settlements:resizeSettlements(payment,2,"2026-11-02")}).outstanding,0);});
+
+test("하루 사용 가능액은 선택일까지의 지출과 이번 주 남은 약속만 반영한다", () => {
+  const value = data();
+  value.expenses = [
+    { id: "today", date: "2026-11-03", amount: 20000, category: "식비", memo: "" },
+    { id: "later", date: "2026-11-04", amount: 40000, category: "식비", memo: "" },
+  ];
+  value.finance!.plans = [
+    { id: "past", date: "2026-11-02", amount: 10000, memo: "" },
+    { id: "this-week", date: "2026-11-07", amount: 24000, memo: "" },
+    { id: "next-week", date: "2026-11-09", amount: 8000, memo: "" },
+  ];
+  assert.deepEqual(dailySpendingAllowance(value, "2026-11-03"), {
+    available: 6000, remaining: 60000, reserved: 24000, days: 6,
+  });
+});
