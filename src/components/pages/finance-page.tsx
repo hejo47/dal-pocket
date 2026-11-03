@@ -3,6 +3,7 @@
 import { MoneyRow } from "@/components/ui/money-row";
 import { SavingsSection } from "@/components/pages/savings-section";
 import { FixedExpenses } from "@/components/pages/fixed-expenses";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { usePocket } from "@/components/providers/pocket-provider";
 import { FieldLabel, FieldHint, TextField, SelectField } from "@/components/ui/form-field";
@@ -10,10 +11,10 @@ import { PillButton } from "@/components/ui/pill-button";
 import { ScreenTitle, PageSkeleton } from "@/components/ui/screen-title";
 import { financeOf, cashFlow, installmentDue, nextMonth } from "@/lib/finance";
 import type { Finance, Installment } from "@/lib/finance";
-import { formatMoney, parseAmount, validAmount } from "@/lib/pocket";
-function FinanceView() {
+import { formatMoney, isDateKey, parseAmount, validAmount } from "@/lib/pocket";
+function FinanceView({ initialMonth }: { initialMonth: string }) {
  const pocket = usePocket(); const finance = financeOf(pocket.data);
- const [month,setMonth] = useState(pocket.today.slice(0,7)); const [kind,setKind] = useState<"incomes"|"plans"|"installments">("incomes");
+ const [month,setMonth] = useState(initialMonth); const [kind,setKind] = useState<"incomes"|"plans"|"installments">("incomes");
  const [date,setDate] = useState(pocket.today); const [amount,setAmount] = useState(""); const [memo,setMemo] = useState(""); const [months,setMonths] = useState("3");
  const [balance,setBalance] = useState(String(finance.openingBalance)); const [openingDate,setOpeningDate] = useState(finance.openingDate === "2000-01-01" ? pocket.today : finance.openingDate);
  const [billingDay,setBillingDay] = useState(String(finance.billingDay)); const [closingDay,setClosingDay] = useState(String(finance.closingDay ?? 31)); const [billingOffset,setBillingOffset] = useState(String(finance.billingOffset ?? 1));
@@ -42,4 +43,4 @@ function FinanceView() {
  {(["incomes","plans","installments"] as const).map((type)=><section key={type} className="flex flex-col gap-3 rounded-xl border border-black-010 p-4"><h2 className="font-semibold">{type === "incomes" ? "수입" : type === "plans" ? "약속 예정 금액" : "할부 내역"}</h2>{finance[type].filter((item)=>type === "installments" ? installmentDue(item as Installment,month)>0 : item.date.slice(0,7)===month).map((item)=><div key={item.id} className="flex items-center justify-between gap-2 border-t border-black-010 py-3"><div className="flex min-w-0 flex-col gap-1"><span className="text-xs text-black-030">{item.date}</span><span className="break-words text-sm">{item.memo || "내용 없음"}</span><span className="font-numbers text-sm">{formatMoney(item.amount)}원 {type === "installments" && ` / ${(item as Installment).months}개월 · 이번 달 ${formatMoney(installmentDue(item as Installment,month))}원`}</span></div><PillButton variant="ghost" size="sm" onClick={()=>save({...finance,[type]:finance[type].filter((entry)=>entry.id!==item.id)})}>{type === "plans" ? "예정 해제" : "삭제"}</PillButton></div>)}<FieldHint>{type === "plans" ? "실제 지출을 기록한 약속은 예정 해제하여 중복 확보를 피하세요." : "등록한 내역이 이곳에 표시됩니다."}</FieldHint></section>)}
  </div>;
 }
-export function FinancePage(){const pocket=usePocket();const setting=financeOf(pocket.data);return pocket.ready ? <FinanceView key={`${setting.openingDate}-${setting.openingBalance}-${setting.billingDay}-${setting.closingDay}-${setting.billingOffset}`} /> : <PageSkeleton />;}
+export function FinancePage(){const pocket=usePocket();const setting=financeOf(pocket.data);const requestedMonth=useSearchParams().get("month");const month=requestedMonth && isDateKey(requestedMonth + "-01") ? requestedMonth : pocket.today.slice(0,7);return pocket.ready ? <FinanceView initialMonth={month} key={`${month}-${setting.openingDate}-${setting.openingBalance}-${setting.billingDay}-${setting.closingDay}-${setting.billingOffset}`} /> : <PageSkeleton />;}
