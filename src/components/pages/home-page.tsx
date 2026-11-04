@@ -54,7 +54,7 @@ export function HomePage() {
     <ScreenTitle title={budgetTitle} subtitle={dailyView ? undefined : period.label} action={editBudget} />
     <PeriodPicker mode={dailyView ? "daily" : data.mode} date={selectedDate} maxDate={today} weekStartsOn={data.weekStartsOn} onChange={(date) => setViewDate(date.slice(0, 7) === today.slice(0, 7) && !dailyView && data.mode === "monthly" ? null : date)} />
     <section aria-label="예산 현황" className="flex flex-col gap-5 border-b border-black-010 pb-6">
-      <div className="flex flex-col gap-1"><p className="text-sm leading-150 text-black-030">{daily ? (selectedDate === today ? "오늘 더 쓸 수 있는 금액" : "이날 더 쓸 수 있었던 금액") : remaining < 0 ? "예산 초과 금액" : "남은 예산"}</p><p className="font-numbers break-all text-4xl font-semibold leading-130">{formatMoney(Math.abs(remaining))}<span className="text-xl">원</span></p></div>
+      <div className="flex flex-col gap-1"><p className="text-sm leading-150 text-black-030">{daily ? (selectedDate === today ? "오늘 더 쓸 수 있는 금액" : "이날 더 쓸 수 있었던 금액") : remaining < 0 ? "예산 초과 금액" : "남은 예산"}</p><p className={`font-numbers break-all text-4xl font-semibold leading-130 ${remaining > 0 ? "text-budget-accent" : "text-black-100"}`}>{formatMoney(Math.abs(remaining))}<span className="text-xl font-medium">원</span></p></div>
       {budget > 0 && remaining >= 0 && remaining <= 1000 && (
         <p className="rounded-lg bg-black-002 px-3 py-2 text-sm leading-150">이 금액이면 그냥 아끼고 다음 주에 몰아 쓰시죠ㅋ</p>
       )}
