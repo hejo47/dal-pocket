@@ -11,20 +11,19 @@
 @font-face { font-family: "SpotlightNumbers"; src: url("/fonts/y-spotlight.1.0.woff") format("woff"); font-weight: 400; font-display: swap; unicode-range: U+0025, U+002B-002E, U+0030-003A, U+2212; }
 
 :root {
-  /* Selected: Rising Chai. Static source files provide only weights 300 and 800. */
   --font-option-pretendard: "Pretendard";
   --font-option-chai: "RisingChai";
   --font-option-spotlight: "YOnlyYouShine";
   --font-option-spotlight-digits: "SpotlightNumbers";
   --font-option-pretendard-digits: "PretendardNumbers";
   --font-option-chai-digits: "ChaiNumbers";
-  --font-body: var(--font-option-chai);
-  --font-body-weight: 500;
-  --font-title: var(--font-option-chai);
-  --font-title-weight: 700;
+  --font-body: var(--font-option-pretendard);
+  --font-body-weight: 400;
+  --font-title: var(--font-option-pretendard);
+  --font-title-weight: 600;
   --font-heading-weight: 600;
   --font-point: var(--font-title);
-  --font-number: var(--font-option-chai);
-  --font-number-weight: 500;
-  --font-number-glyphs: var(--font-option-chai-digits);
+  --font-number: var(--font-option-pretendard);
+  --font-number-weight: 400;
+  --font-number-glyphs: var(--font-option-pretendard);
 }

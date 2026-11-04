@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createContext, useCallback, useContext, useRef, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 
 import { CATEGORIES, getPeriod, getPeriodExpenses, todayInSeoul } from "@/lib/pocket";
@@ -26,15 +26,6 @@ function usePocketController() {
   const dismissNotice = useCallback(() => setNotice(null), []);
   const [editor, setEditor] = useState<EditorState>({ open: false, expenseId: null, draft: emptyDraft("2000-01-01") });
   const returnFocus = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (!ready) return;
-    const root = document.documentElement;
-    root.style.setProperty("--font-body", data.fonts.body === "chai" ? "var(--font-option-chai)" : "var(--font-option-spotlight)");
-    root.style.setProperty("--font-number", data.fonts.numbers === "chai" ? "var(--font-option-chai)" : "var(--font-option-spotlight)");
-    root.style.setProperty("--font-number-glyphs", data.fonts.numbers === "chai" ? "var(--font-option-chai-digits)" : "var(--font-option-spotlight-digits)");
-    root.style.setProperty("--font-title", data.fonts.title === "chai" ? "var(--font-option-chai)" : "var(--font-option-spotlight)");
-  }, [data.fonts.body, data.fonts.numbers, data.fonts.title, ready]);
 
   function notify(message: string, persisted = true) {
     setNotice({ message: persisted ? message : `${message} 브라우저 저장을 사용할 수 없어 새로고침하면 사라질 수 있습니다.` });
