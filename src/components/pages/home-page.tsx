@@ -5,7 +5,7 @@ import { PeriodPicker } from "@/components/ui/period-picker";
 import { MoneyRow } from "@/components/ui/money-row";
 
 import { useState } from "react";
-import { ArrowDownToLine } from "lucide-react";
+import { ArrowDownToLine, SquarePen } from "lucide-react";
 import { IconContainer } from "@/components/ui/icon-container";
 
 import { HomePlans } from "@/components/pages/home-plans";
@@ -25,7 +25,7 @@ export function HomePage() {
   const { data, today, dailyView } = pocket;
   const selectedDate = viewDate ?? today;
   const budgetHref = `/budget?month=${selectedDate.slice(0, 7)}`;
-  const editBudget = <PillButton href={budgetHref} variant="outline" size="sm">예산 수정</PillButton>;
+  const editBudget = <PillButton href={budgetHref} variant="ghost" size="icon"><IconContainer size="slg"><SquarePen /></IconContainer><span className="sr-only">예산 수정</span></PillButton>;
   const period = getPeriod(dailyView ? "weekly" : data.mode, data.weekStartsOn, selectedDate);
   const summary = financeSummary(data, period);
   const month = selectedDate.slice(0, 7);
