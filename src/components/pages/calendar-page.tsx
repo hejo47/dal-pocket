@@ -1,9 +1,11 @@
 "use client";
 
+import { IconLink } from "@/components/ui/icon-link";
+
 import { PeriodPicker } from "@/components/ui/period-picker";
 
 import { useState } from "react";
-import { Plus, Stamp } from "lucide-react";
+import { CalendarClock, Plus, Stamp } from "lucide-react";
 
 import { ExpenseList } from "@/components/pages/expense-list";
 import { usePocket } from "@/components/providers/pocket-provider";
@@ -62,7 +64,7 @@ function CalendarView() {
       {(stamped || canStamp) && <PillButton type="button" variant="outline" size="sm" className="self-start" aria-pressed={stamped} onClick={toggleStamp}>
         <IconContainer size="sm"><Stamp /></IconContainer>{stamped ? "무지출 스탬프 취소" : "무지출 스탬프 찍기"}
       </PillButton>}
-      <div className="flex flex-col gap-2 rounded-lg border border-black-010 p-3"><div className="flex items-center justify-between gap-2"><h3 className="text-sm">이 날짜 약속 예정</h3><PillButton href={`/finance?month=${month}`} variant="outline" size="sm">등록·관리</PillButton></div>{finance.plans.filter((plan)=>plan.date===selected).map((plan)=><p key={plan.id} className="text-sm">{plan.memo || "약속"} · {formatMoney(plan.amount)}원</p>)}</div>
+      <div className="flex flex-col gap-2 rounded-lg border border-black-010 p-3"><div className="flex items-center justify-between gap-2"><h3 className="text-sm">이 날짜 약속 예정</h3><IconLink href={`/finance?month=${month}`} label="약속 등록·관리"><CalendarClock /></IconLink></div>{finance.plans.filter((plan)=>plan.date===selected).map((plan)=><p key={plan.id} className="text-sm">{plan.memo || "약속"} · {formatMoney(plan.amount)}원</p>)}</div>
       <ExpenseList expenses={selectedExpenses} />
     </section>
   </div>;

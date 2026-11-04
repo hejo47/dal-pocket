@@ -1,6 +1,7 @@
 "use client";
 
 import { createDemoData, isPocketData, normalizePocketData, todayInSeoul } from "@/lib/pocket";
+import { emptyFinance } from "@/lib/finance";
 import type { PocketData } from "@/lib/pocket";
 import type { PocketPacket } from "@/lib/pocket-api";
 
@@ -9,7 +10,11 @@ type Snapshot = { data: PocketData; today: string; ready: boolean; storage: Stor
 type SyncMeta = { revision: number | null; dirty: boolean };
 const KEY = "dal-pocket-v1";
 const META_KEY = "dal-pocket-sync-v1";
-const serverSnapshot: Snapshot = { data: createDemoData("2000-01-01"), today: "2000-01-01", ready: false, storage: "local" };
+function createBlankData(today: string): PocketData {
+  return { ...createDemoData(today), finance: emptyFinance(), expenses: [] };
+}
+
+const serverSnapshot: Snapshot = { data: createBlankData("2000-01-01"), today: "2000-01-01", ready: false, storage: "local" };
 let snapshot: Snapshot | undefined;
 let cloudStarted = false;
 let cloudEnabled = false;
@@ -29,7 +34,7 @@ export function adoptCloudPacket(packet: PocketPacket) {
   cloudRevision = packet.revision;
   pending = null;
   syncMeta = { revision: packet.revision, dirty: false };
-  snapshot = { ...getSnapshot(), data: packet.data ?? createDemoData(todayInSeoul()), storage: "synced" };
+  snapshot = { ...getSnapshot(), data: packet.data ?? createBlankData(todayInSeoul()), storage: "synced" };
   persist();
   emit();
 }
@@ -40,7 +45,7 @@ export function clearLocalPocket() {
   cloudEnabled = false;
   cloudRevision = null;
   syncMeta = { revision: null, dirty: false };
-  snapshot = { data: createDemoData(today), today, ready: true, storage: "local" };
+  snapshot = { data: createBlankData(today), today, ready: true, storage: "local" };
   persist();
   emit();
 }
@@ -48,14 +53,14 @@ export function clearLocalPocket() {
 export function getSnapshot(): Snapshot {
   if (snapshot) return snapshot;
   const today = todayInSeoul();
-  let data = createDemoData(today);
+  let data = createBlankData(today);
   try {
     const stored = window.localStorage.getItem(KEY);
     if (stored) {
       const parsed: unknown = JSON.parse(stored);
       const normalized = normalizePocketData(parsed);
       if (normalized) {
-        data = normalized;
+        data = normalized.isDemo ? { ...normalized, finance: emptyFinance(), expenses: [] } : normalized;
         syncMeta = { revision: null, dirty: !data.isDemo };
         const meta = JSON.parse(window.localStorage.getItem(META_KEY) ?? "null") as SyncMeta | null;
         if (meta && (meta.revision === null || Number.isSafeInteger(meta.revision) && meta.revision >= 0) && typeof meta.dirty === "boolean") syncMeta = meta;

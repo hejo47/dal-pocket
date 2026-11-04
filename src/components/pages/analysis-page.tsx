@@ -1,13 +1,14 @@
 "use client";
 
+import { IconLink } from "@/components/ui/icon-link";
+
 import { PeriodPicker } from "@/components/ui/period-picker";
 
-import { PillButton } from "@/components/ui/pill-button";
 import { MoneyRow } from "@/components/ui/money-row";
 
 import Link from "next/link";
 import { useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, SquarePen, WalletCards } from "lucide-react";
 
 import { usePocket } from "@/components/providers/pocket-provider";
 import { IconContainer } from "@/components/ui/icon-container";
@@ -38,7 +39,7 @@ export function AnalysisPage() {
     <ScreenTitle title="지출 분석" subtitle={`${period.label} · 기록한 지출 기준`} />
     <PeriodPicker date={month + "-01"} maxDate={today} onChange={(date) => setSelectedMonth(date.slice(0, 7))} />
     <div className="flex items-center justify-between gap-3"><span className="text-sm leading-150 text-black-030">{period.scope} 지출</span><p className="font-numbers text-2xl leading-140">{formatMoney(summary.spent)}원</p></div>
-    <div className="flex flex-col gap-2 rounded-xl border border-black-010 p-4 text-sm"><dl><MoneyRow label="일반 지출" amount={summary.regularSpent} /><MoneyRow label="고정 지출 · 별도" amount={summary.fixedSpent} /></dl><PillButton href={`/finance?month=${month}#fixed-costs`} variant="outline" size="sm" className="self-start">고정 내역 관리</PillButton></div>
+    <div className="flex flex-col gap-2 rounded-xl border border-black-010 p-4 text-sm"><dl><MoneyRow label="일반 지출" amount={summary.regularSpent} /><MoneyRow label="고정 지출 · 별도" amount={summary.fixedSpent} /></dl><IconLink href={`/finance?month=${month}#fixed-costs`} label="고정 내역 관리" className="self-start"><SquarePen /></IconLink></div>
     <section className="flex flex-col gap-5"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold leading-150">카테고리별 지출</h2><span className="text-xs leading-150 text-black-030">항목 선택 시 내역 보기</span></div>
       {groups.length ? <div className="flex flex-col gap-5">{groups.map((group) => <Link key={group.category} href={{ pathname: "/expenses", query: { month, category: group.category } }} className="flex flex-col gap-2 rounded py-1" aria-label={`${group.category}, ${formatMoney(group.amount)}원, ${group.percent}%, 내역 보기`}><div className="flex items-center justify-between gap-2"><span className="text-sm leading-150">{group.category}</span><div className="flex items-center gap-2"><span className="font-numbers text-sm leading-150">{formatMoney(group.amount)}원 <span className="text-xs text-black-030">· {group.percent}%</span></span><IconContainer size="sm" className="text-black-030"><ChevronRight /></IconContainer></div></div><div className="flex h-1.5 overflow-hidden rounded-full bg-black-002"><span className="bg-black-100" style={{ width: `${group.percent}%` }} /></div></Link>)}</div> : <p className="py-8 text-sm leading-160 text-black-030">이 기간에 기록한 지출이 없습니다.</p>}
     </section>
@@ -48,7 +49,7 @@ export function AnalysisPage() {
     <section aria-label="카드와 현금 흐름" className="flex flex-col gap-3 rounded-xl border border-black-010 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-semibold">{Number(month.slice(5))}월 카드·현금 흐름</h2>
-        <PillButton href={`/finance?month=${month}`} variant="outline" size="sm">현금 흐름 보기</PillButton>
+        <IconLink href={`/finance?month=${month}`} label="현금 흐름 보기"><WalletCards /></IconLink>
       </div>
       <dl>
         <MoneyRow label="카드값 · 받은 정산 차감" amount={flow.cardBill} />

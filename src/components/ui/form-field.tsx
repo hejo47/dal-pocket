@@ -8,7 +8,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { cn } from "@/lib/utils";
 
 export function TextField(props: ComponentProps<typeof Input>) { return <Input {...props} />; }
-export function DateField({ className, ...props }: ComponentProps<typeof Input>) { return <Input {...props} type="date" className={cn("font-numbers", className)} />; }
+export { DateField } from "@/components/ui/date-picker";
 type Option = { value: string; label: string };
 export function SelectField({ options, ...props }: ComponentProps<typeof NativeSelect> & { options: readonly Option[] }) {
   return <NativeSelect {...props}>{options.map((option) => <NativeSelectOption key={option.value} value={option.value}>{option.label}</NativeSelectOption>)}</NativeSelect>;

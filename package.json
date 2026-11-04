@@ -17,6 +17,7 @@
     "test:api": "node --experimental-strip-types --test tests/pocket-api.integration.mts"
   },
   "dependencies": {
+    "@daypicker/react": "^10.0.2",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "@supabase/ssr": "^0.12.7",

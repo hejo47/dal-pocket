@@ -95,22 +95,17 @@
   to { visibility: visible; }
 }
 
-input[type="date"], input[type="month"] {
-  -webkit-appearance: none;
-  appearance: none;
-  box-sizing: border-box;
-  display: block;
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  inline-size: 100%;
-  min-inline-size: 0;
-  max-inline-size: 100%;
-  margin-inline: 0;
-  padding: 0;
-}
-input::-webkit-date-and-time-value { min-width: 0; height: 1.5em; text-align: left; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0s !important; transition-duration: 0s !important; }
+}
+
+.rdp-root.pocket-date-picker {
+  --rdp-accent-color: var(--color-black-100);
+  --rdp-accent-background-color: var(--color-black-002);
+  --rdp-day-width: clamp(28px, 9vw, 42px);
+  --rdp-day-height: 42px;
+  --rdp-day_button-width: var(--rdp-day-width);
+  --rdp-day_button-height: var(--rdp-day-height);
+  --rdp-selected-border: 1px solid var(--color-black-100);
 }

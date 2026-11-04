@@ -45,7 +45,7 @@ export function offsetDate(value: string, days: number) {
 
 export function shortDate(value: string) {
   const [, month, day] = value.split("-");
-  return `${Number(month)}. ${Number(day)}.`;
+  return `${Number(month)}. ${Number(day)}`;
 }
 
 export function getPeriod(mode: BudgetMode, weekStartsOn: number, today: string) {

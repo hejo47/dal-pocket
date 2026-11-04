@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePocket } from "@/components/providers/pocket-provider";
-import { FieldHint, FieldLabel, SelectField, TextField } from "@/components/ui/form-field";
+import { DateField, FieldHint, FieldLabel, SelectField, TextField } from "@/components/ui/form-field";
 import { PillButton } from "@/components/ui/pill-button";
 import { cashFlow, financeOf } from "@/lib/finance";
 import { formatMoney, parseAmount, validAmount } from "@/lib/pocket";
@@ -26,7 +26,7 @@ export function SavingsSection({ month }: { month: string }) {
       setAmount(""); setMemo(""); setOpen(false);
     }}>
       <FieldLabel htmlFor="savings-direction">기록 종류</FieldLabel><SelectField id="savings-direction" value={direction} options={[{ value: "deposit", label: "저축 계좌로 넣음" }, { value: "withdraw", label: "저축 계좌에서 꺼냄" }]} onChange={(event) => setDirection(event.target.value as typeof direction)} />
-      <FieldLabel htmlFor="savings-date" required>날짜</FieldLabel><TextField id="savings-date" type="date" required value={date} onChange={(event) => setDate(event.target.value)} />
+      <FieldLabel htmlFor="savings-date" required>날짜</FieldLabel><DateField id="savings-date" required value={date} onValueChange={(value) => setDate(value)} />
       <FieldLabel htmlFor="savings-amount" required>금액</FieldLabel><TextField id="savings-amount" inputMode="numeric" required value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} />
       <FieldLabel htmlFor="savings-memo">계좌·내용 메모</FieldLabel><TextField id="savings-memo" maxLength={80} placeholder="적금, 비상금 등" value={memo} onChange={(event) => setMemo(event.target.value)} />
       <FieldHint>저축은 소비·생활 예산 합계에 넣지 않습니다. 저축하면 사용 가능한 현금이 줄고, 인출하면 늘어납니다. 시작 현금 잔액에 이미 반영된 이전 저축은 현금 계산 시작일 이전 날짜로 기록하세요.</FieldHint><PillButton type="submit">저축 기록 저장</PillButton>

@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { usePocket } from "@/components/providers/pocket-provider";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { FieldLabel, TextField } from "@/components/ui/form-field";
+import { DateField, FieldLabel, TextField } from "@/components/ui/form-field";
 import { PillButton } from "@/components/ui/pill-button";
 import { financeOf } from "@/lib/finance";
 import { formatMoney, isDateKey, parseAmount, validAmount } from "@/lib/pocket";
@@ -12,6 +12,7 @@ import { formatMoney, isDateKey, parseAmount, validAmount } from "@/lib/pocket";
 export function HomePlans({ date }: { date: string }) {
   const pocket = usePocket();
   const [open, setOpen] = useState(false);
+  const [planDate, setPlanDate] = useState(date);
   const [error, setError] = useState("");
   const finance = financeOf(pocket.data);
   const overdue = finance.plans.filter((plan) => plan.date < pocket.today);
@@ -31,7 +32,7 @@ export function HomePlans({ date }: { date: string }) {
   }
 
   return <div className="flex min-w-0 flex-col gap-2">
-    <Dialog open={open} onOpenChange={(next) => { setOpen(next); setError(""); }}>
+    <Dialog open={open} onOpenChange={(next) => { setOpen(next); setError(""); if (next) setPlanDate(date); }}>
       <DialogTrigger asChild><PillButton type="button" variant="outline" size="sm" className="self-start">약속 비용 설정</PillButton></DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -41,7 +42,7 @@ export function HomePlans({ date }: { date: string }) {
         <form className="flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto" onSubmit={savePlan}>
           <div className="flex min-w-0 flex-col gap-2">
             <FieldLabel htmlFor="home-plan-date" required>약속 날짜</FieldLabel>
-            <TextField id="home-plan-date" name="date" type="date" defaultValue={date} required />
+            <DateField id="home-plan-date" name="date" value={planDate} onValueChange={setPlanDate} required />
             <FieldLabel htmlFor="home-plan-memo">약속 이름</FieldLabel>
             <TextField id="home-plan-memo" name="memo" maxLength={80} />
             <FieldLabel htmlFor="home-plan-amount" required>예상 비용 (원)</FieldLabel>
