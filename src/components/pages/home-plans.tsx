@@ -35,9 +35,12 @@ export function HomePlans({ date, amount }: { date: string; amount: number }) {
 
   return <div className="flex min-w-0 flex-col gap-2">
     <Dialog open={open} onOpenChange={(next) => { setOpen(next); setError(""); if (next) setPlanDate(date); }}>
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm">약속 예산 <span className="font-numbers font-semibold">{formatMoney(amount)}원</span></p>
-        <DialogTrigger asChild><PillButton type="button" variant="ghost" size="icon" aria-label="약속 비용 설정" title="약속 비용 설정"><IconContainer size="slg"><SquarePen /></IconContainer></PillButton></DialogTrigger>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <div className="flex items-center gap-1">
+          <p className="text-xs leading-150 text-black-030">약속 예산</p>
+          <DialogTrigger asChild><PillButton type="button" variant="ghost" size="icon" className="px-2 py-2 text-black-030" aria-label="약속 비용 설정" title="약속 비용 설정"><IconContainer size="sm"><SquarePen /></IconContainer></PillButton></DialogTrigger>
+        </div>
+        <p className="font-numbers ml-auto break-all text-sm font-medium leading-150">{formatMoney(amount)}<span className="text-xs">원</span></p>
       </div>
       <DialogContent>
         <DialogHeader>

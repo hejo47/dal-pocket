@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { SquarePen, Trash2 } from "lucide-react";
+import { Plus, SquarePen, Trash2 } from "lucide-react";
 
 import { usePocket } from "@/components/providers/pocket-provider";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -72,9 +72,13 @@ export function CategoryManager({ onAdded, onDeleted }: {
       </> : <div className="pocket-dialog-scroll flex flex-col gap-3">
         <form onSubmit={add} className="flex flex-col gap-2">
           <FieldLabel htmlFor="new-category">새 카테고리</FieldLabel>
-          <TextField id="new-category" maxLength={10} placeholder="카테고리 이름" value={name}
-            onChange={(event) => { setName(event.target.value); setError(""); }} />
-          <PillButton type="submit" size="sm" className="self-end" disabled={categories.length >= 30}>추가</PillButton>
+          <div className="flex min-w-0 items-center gap-2">
+            <TextField id="new-category" className="min-w-0 flex-1" maxLength={10} placeholder="카테고리 이름" value={name}
+              onChange={(event) => { setName(event.target.value); setError(""); }} />
+            <PillButton type="submit" size="icon" className="shrink-0" aria-label="카테고리 추가" title="카테고리 추가" disabled={categories.length >= 30}>
+              <IconContainer size="slg"><Plus /></IconContainer>
+            </PillButton>
+          </div>
           {error && <p role="alert" className="text-xs text-red-2">{error}</p>}
         </form>
         <ul className="flex flex-wrap gap-2" aria-label="등록된 카테고리">
