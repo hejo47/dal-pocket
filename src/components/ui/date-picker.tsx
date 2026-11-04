@@ -63,7 +63,7 @@ export function DateField({
     </DialogTrigger>
     <DialogContent aria-describedby={undefined}>
       <DialogHeader><DialogTitle>{title}{required && <span className="ml-2 text-xs text-red-2">필수</span>}</DialogTitle></DialogHeader>
-      <div className="min-h-0 overflow-y-auto">
+      <div className="pocket-dialog-scroll">
         {monthly ? <MonthOptions value={date} min={min} max={max} onSelect={choose} /> : <DayPicker
           className="pocket-date-picker"
           locale={ko}

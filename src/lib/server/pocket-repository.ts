@@ -27,10 +27,6 @@ export async function readPocket(ownerId: string) {
   return toPacket(await getPrisma().pocket.findUnique({ where: { id: ownerId }, include: { expenses: true } }));
 }
 
-export async function deletePocket(ownerId: string) {
-  await getPrisma().pocket.deleteMany({ where: { id: ownerId } });
-}
-
 export async function writePocket(ownerId: string, { data, revision }: PocketWrite) {
   const db = getPrisma();
   return db.$transaction(async (tx) => {

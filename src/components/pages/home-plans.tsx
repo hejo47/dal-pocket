@@ -44,7 +44,7 @@ export function HomePlans({ date, amount }: { date: string; amount: number }) {
           <DialogTitle>약속 비용 설정</DialogTitle>
           <DialogDescription>약속 날짜와 예상 비용을 기록해두세요.</DialogDescription>
         </DialogHeader>
-        <form className="flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto" onSubmit={savePlan}>
+        <form className="pocket-dialog-scroll flex flex-col gap-4" onSubmit={savePlan}>
           <div className="flex min-w-0 flex-col gap-2">
             <FieldLabel htmlFor="home-plan-date" required>약속 날짜</FieldLabel>
             <DateField id="home-plan-date" name="date" value={planDate} onValueChange={setPlanDate} required />

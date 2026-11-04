@@ -3,10 +3,11 @@
 import { createDemoData, isPocketData, normalizePocketData, todayInSeoul } from "@/lib/pocket";
 import { emptyFinance } from "@/lib/finance";
 import type { PocketData } from "@/lib/pocket";
+import { POCKET_ACCOUNT_HEADER } from "@/lib/pocket-api";
 import type { PocketPacket } from "@/lib/pocket-api";
 
 type StorageState = "local" | "connecting" | "syncing" | "synced" | "error" | "conflict";
-type Snapshot = { data: PocketData; today: string; ready: boolean; storage: StorageState };
+type Snapshot = { accountVersion: number; data: PocketData; today: string; ready: boolean; storage: StorageState };
 type SyncMeta = { revision: number | null; dirty: boolean };
 const KEY = "dal-pocket-v1";
 const META_KEY = "dal-pocket-sync-v1";
@@ -14,9 +15,10 @@ function createBlankData(today: string): PocketData {
   return { ...createDemoData(today), finance: emptyFinance(), expenses: [] };
 }
 
-const serverSnapshot: Snapshot = { data: createBlankData("2000-01-01"), today: "2000-01-01", ready: false, storage: "local" };
+const serverSnapshot: Snapshot = { accountVersion: 0, data: createBlankData("2000-01-01"), today: "2000-01-01", ready: false, storage: "local" };
 let snapshot: Snapshot | undefined;
-let cloudStarted = false;
+let account: string | null = null;
+let accountVersion = 0;
 let cloudEnabled = false;
 let cloudRevision: number | null = null;
 let pending: PocketData | null = null;
@@ -27,67 +29,63 @@ const listeners = new Set<() => void>();
 
 export function getServerSnapshot() { return serverSnapshot; }
 
-export function getLocalData() { return getSnapshot().data; }
-
-export function adoptCloudPacket(packet: PocketPacket) {
-  cloudEnabled = true;
-  cloudRevision = packet.revision;
-  pending = null;
-  syncMeta = { revision: packet.revision, dirty: false };
-  snapshot = { ...getSnapshot(), data: packet.data ?? createBlankData(todayInSeoul()), storage: "synced" };
-  persist();
-  emit();
-}
-
-export function clearLocalPocket() {
-  const today = todayInSeoul();
+export function setPocketAccount(next: string | null) {
+  if (account === next) return;
+  account = next;
+  accountVersion++;
+  snapshot = undefined;
   pending = null;
   cloudEnabled = false;
   cloudRevision = null;
+  flushing = false;
+  refreshing = false;
   syncMeta = { revision: null, dirty: false };
-  snapshot = { data: createBlankData(today), today, ready: true, storage: "local" };
-  persist();
   emit();
+  if (next) void retryCloud();
 }
 
 export function getSnapshot(): Snapshot {
   if (snapshot) return snapshot;
   const today = todayInSeoul();
   let data = createBlankData(today);
+  let cached = false;
   try {
-    const stored = window.localStorage.getItem(KEY);
+    const stored = account ? window.localStorage.getItem(`${KEY}:${account}`) : null;
     if (stored) {
       const parsed: unknown = JSON.parse(stored);
       const normalized = normalizePocketData(parsed);
       if (normalized) {
+        cached = true;
         data = normalized.isDemo ? { ...normalized, finance: emptyFinance(), expenses: [] } : normalized;
         syncMeta = { revision: null, dirty: !data.isDemo };
-        const meta = JSON.parse(window.localStorage.getItem(META_KEY) ?? "null") as SyncMeta | null;
+        const meta = JSON.parse(window.localStorage.getItem(`${META_KEY}:${account}`) ?? "null") as SyncMeta | null;
         if (meta && (meta.revision === null || Number.isSafeInteger(meta.revision) && meta.revision >= 0) && typeof meta.dirty === "boolean") syncMeta = meta;
       }
     }
   } catch { /* Keep the page usable when browser storage is unavailable. */ }
-  snapshot = { data, today, ready: true, storage: cloudStarted ? "connecting" : "local" };
+  snapshot = { accountVersion, data, today, ready: !account || cached, storage: account ? "connecting" : "local" };
   return snapshot;
 }
 
 function emit() { listeners.forEach((listener) => listener()); }
 
 function setStorage(storage: StorageState) {
-  snapshot = { ...getSnapshot(), storage };
+  const current = getSnapshot();
+  snapshot = { ...current, storage, ready: current.ready || storage !== "connecting" };
   emit();
 }
 
 function persist() {
+  if (!account) return true;
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(getSnapshot().data));
-    window.localStorage.setItem(META_KEY, JSON.stringify(syncMeta));
+    window.localStorage.setItem(`${KEY}:${account}`, JSON.stringify(getSnapshot().data));
+    window.localStorage.setItem(`${META_KEY}:${account}`, JSON.stringify(syncMeta));
     return true;
   } catch { return false; }
 }
 
-async function readCloud() {
-  const response = await fetch("/api/pocket", { cache: "no-store", credentials: "same-origin", signal: AbortSignal.timeout(12000) });
+async function readCloud(owner: string) {
+  const response = await fetch("/api/pocket", { cache: "no-store", credentials: "same-origin", headers: { [POCKET_ACCOUNT_HEADER]: owner }, signal: AbortSignal.timeout(12000) });
   if (!response.ok) {
     const error = await response.json();
     if (error.code === "DATABASE_NOT_CONFIGURED") return null;
@@ -99,7 +97,9 @@ async function readCloud() {
 }
 
 async function flushCloud() {
-  if (!cloudEnabled || cloudRevision === null || flushing) return;
+  if (!account || !cloudEnabled || cloudRevision === null || flushing) return;
+  const owner = account;
+  const version = accountVersion;
   flushing = true;
   try {
     while (pending) {
@@ -107,33 +107,39 @@ async function flushCloud() {
       pending = null;
       setStorage("syncing");
       try {
-        const response = await fetch("/api/pocket", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data: target, revision: cloudRevision }), signal: AbortSignal.timeout(15000) });
+        const response = await fetch("/api/pocket", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json", [POCKET_ACCOUNT_HEADER]: owner }, body: JSON.stringify({ data: target, revision: cloudRevision }), signal: AbortSignal.timeout(15000) });
+        if (version !== accountVersion) return;
         if (!response.ok) {
           pending ??= target;
           setStorage(response.status === 409 ? "conflict" : "error");
           return;
         }
         const packet: PocketPacket = await response.json();
+        if (version !== accountVersion) return;
         if (packet.revision !== cloudRevision + 1) throw new Error("INVALID_SERVER_REVISION");
         cloudRevision = packet.revision;
         syncMeta = { revision: cloudRevision, dirty: pending !== null };
         persist();
       } catch {
+        if (version !== accountVersion) return;
         pending ??= target;
         setStorage("error");
         return;
       }
     }
     setStorage("synced");
-  } finally { flushing = false; }
+  } finally { if (version === accountVersion) flushing = false; }
 }
 
 export async function retryCloud(options: { silent?: boolean } = {}) {
-  if (flushing || refreshing) return;
+  if (!account || flushing || refreshing) return;
+  const owner = account;
+  const version = accountVersion;
   refreshing = true;
   if (!options.silent) setStorage("connecting");
   try {
-    const packet = await readCloud();
+    const packet = await readCloud(owner);
+    if (version !== accountVersion) return;
     if (!packet) { cloudEnabled = false; setStorage("local"); return; }
     if (flushing || cloudRevision !== null && packet.revision < cloudRevision) return;
     cloudEnabled = true;
@@ -144,7 +150,7 @@ export async function retryCloud(options: { silent?: boolean } = {}) {
       return;
     }
     if (packet.data && !syncMeta.dirty) {
-      snapshot = { ...current, data: { ...packet.data, mode: current.data.mode }, storage: "synced" };
+      snapshot = { ...current, data: { ...packet.data, mode: current.data.mode }, storage: "synced", ready: true };
       syncMeta = { revision: packet.revision, dirty: false };
       persist();
       emit();
@@ -152,37 +158,39 @@ export async function retryCloud(options: { silent?: boolean } = {}) {
       pending = current.data;
       await flushCloud();
     } else if (packet.data) {
-      snapshot = { ...current, data: { ...packet.data, mode: current.data.mode }, storage: "synced" };
+      snapshot = { ...current, data: { ...packet.data, mode: current.data.mode }, storage: "synced", ready: true };
       syncMeta = { revision: packet.revision, dirty: false };
       persist();
       emit();
     } else { setStorage("synced"); }
-  } catch { setStorage("error"); }
-  finally { refreshing = false; }
+  } catch { if (version === accountVersion) setStorage("error"); }
+  finally { if (version === accountVersion) refreshing = false; }
 }
 
 export async function loadServerCopy() {
-  if (flushing) return;
+  if (!account || flushing) return;
+  const owner = account;
+  const version = accountVersion;
   try {
-    const packet = await readCloud();
+    const packet = await readCloud(owner);
+    if (version !== accountVersion) return;
     if (!packet?.data) { setStorage("error"); return; }
     // Preserve the local copy before replacing it after an explicit user action.
-    window.localStorage.setItem("dal-pocket-local-backup", JSON.stringify(getSnapshot().data));
+    window.localStorage.setItem(`dal-pocket-local-backup:${owner}`, JSON.stringify(getSnapshot().data));
     pending = null;
     cloudEnabled = true;
     cloudRevision = packet.revision;
     syncMeta = { revision: packet.revision, dirty: false };
-    snapshot = { ...getSnapshot(), data: packet.data, storage: "synced" };
+    snapshot = { ...getSnapshot(), data: packet.data, storage: "synced", ready: true };
     persist();
     emit();
-  } catch { setStorage("error"); }
+  } catch { if (version === accountVersion) setStorage("error"); }
 }
 
 export function subscribe(listener: () => void) {
   listeners.add(listener);
-  if (!cloudStarted) { cloudStarted = true; void retryCloud(); }
   const onStorage = (event: StorageEvent) => {
-    if (event.key === META_KEY || event.key === null) {
+    if (account && (event.key === `${META_KEY}:${account}` || event.key === null)) {
       if (flushing || pending) return;
       snapshot = undefined;
       getSnapshot();
@@ -194,7 +202,7 @@ export function subscribe(listener: () => void) {
     const current = getSnapshot();
     const today = todayInSeoul();
     if (today !== current.today) { snapshot = { ...current, today }; emit(); }
-    if (document.visibilityState === "visible" && cloudEnabled && current.storage !== "conflict") void retryCloud({ silent: true });
+    if (document.visibilityState === "visible" && account && current.storage !== "conflict") void retryCloud({ silent: true });
   };
   window.addEventListener("storage", onStorage);
   window.addEventListener("focus", onFocus);
@@ -209,8 +217,9 @@ export function subscribe(listener: () => void) {
   };
 }
 
-export function updatePocket(updater: (current: PocketData) => PocketData, options: { sync?: boolean } = {}) {
+export function updatePocket(expectedVersion: number, updater: (current: PocketData) => PocketData, options: { sync?: boolean } = {}) {
   const shouldSync = options.sync !== false;
+  if (expectedVersion !== accountVersion || (shouldSync && !account)) return false;
   const current = getSnapshot();
   const data = updater(current.data);
   if (!isPocketData(data)) throw new Error("저장할 내용을 확인해주세요.");
@@ -218,7 +227,7 @@ export function updatePocket(updater: (current: PocketData) => PocketData, optio
   if (shouldSync) syncMeta = { ...syncMeta, dirty: !data.isDemo };
   const persisted = persist();
   emit();
-  if (shouldSync && !data.isDemo && cloudEnabled && current.storage !== "conflict" && current.storage !== "error") {
+  if (shouldSync && !data.isDemo && account && current.storage !== "conflict" && current.storage !== "error") {
     pending = data;
     void flushCloud();
   }

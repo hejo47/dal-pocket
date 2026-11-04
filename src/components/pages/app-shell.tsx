@@ -7,6 +7,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { setPocketAccount } from "@/lib/pocket-storage";
 import { hasSupabaseAuthConfig } from "@/lib/supabase/config";
 import { CalendarDays, ChartNoAxesCombined, House, NotebookPen, Plus, UserRound, WalletCards } from "lucide-react";
 
@@ -61,6 +62,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hasSupabaseAuthConfig) return;
     const { data: { subscription } } = createClient().auth.onAuthStateChange((_event, session) => {
+      setPocketAccount(session?.user.id ?? null);
       setSignedIn(Boolean(session));
     });
     return () => subscription.unsubscribe();

@@ -1,6 +1,7 @@
 import { isPocketData, todayInSeoul } from "./pocket.ts";
 import type { PocketData } from "./pocket.ts";
 
+export const POCKET_ACCOUNT_HEADER = "x-pocket-account";
 export const MAX_EXPENSES = 10000;
 export const MAX_BODY_BYTES = 2_000_000;
 export type PocketPacket = { data: PocketData | null; revision: number };

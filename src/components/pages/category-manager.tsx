@@ -46,7 +46,7 @@ export function CategoryManager({ onAdded, onDeleted }: {
         <IconContainer size="slg"><SquarePen /></IconContainer>
       </PillButton>
     </DialogTrigger>
-    <DialogContent>
+    <DialogContent size="compact">
       <DialogHeader>
         <DialogTitle>{deleting ? "카테고리 삭제" : "카테고리 관리"}</DialogTitle>
         <DialogDescription>{deleting
@@ -69,20 +69,18 @@ export function CategoryManager({ onAdded, onDeleted }: {
             }
           }}>삭제</PillButton>
         </DialogFooter>
-      </> : <div className="flex min-h-0 flex-col gap-3 overflow-y-auto">
+      </> : <div className="pocket-dialog-scroll flex flex-col gap-3">
         <form onSubmit={add} className="flex flex-col gap-2">
           <FieldLabel htmlFor="new-category">새 카테고리</FieldLabel>
-          <div className="flex items-center gap-2">
-            <TextField id="new-category" maxLength={10} placeholder="카테고리 이름" value={name}
-              onChange={(event) => { setName(event.target.value); setError(""); }} />
-            <PillButton type="submit" size="sm" className="shrink-0" disabled={categories.length >= 30}>추가</PillButton>
-          </div>
+          <TextField id="new-category" maxLength={10} placeholder="카테고리 이름" value={name}
+            onChange={(event) => { setName(event.target.value); setError(""); }} />
+          <PillButton type="submit" size="sm" className="self-end" disabled={categories.length >= 30}>추가</PillButton>
           {error && <p role="alert" className="text-xs text-red-2">{error}</p>}
         </form>
-        <ul className="flex flex-col gap-2">
-          {categories.map((item) => <li key={item} className="flex items-center justify-between gap-2 rounded-lg bg-black-002 px-3 py-1">
-            <span className="text-sm">{item}</span>
-            <PillButton type="button" variant="outline" size="icon" className="px-2 py-2 shadow-none"
+        <ul className="flex flex-wrap gap-2" aria-label="등록된 카테고리">
+          {categories.map((item) => <li key={item} className="inline-flex max-w-full items-center gap-2 rounded-full bg-black-002 py-1 pr-1 pl-3">
+            <span className="min-w-0 break-words text-sm">{item}</span>
+            <PillButton type="button" variant="outline" size="icon" className="shrink-0 rounded-full px-2 py-2 shadow-none"
               aria-label={`${item} 삭제`} title={`${item} 삭제`} disabled={categories.length <= 1} onClick={() => {
                 setDeleting(item);
                 setReplacement(categories.find((candidate) => candidate !== item) ?? "");

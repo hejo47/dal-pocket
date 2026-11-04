@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-[http://localhost:3000](http://localhost:3000)에서 확인합니다. DB 설정 없이도 예시 화면과 브라우저 저장 기능을 사용할 수 있습니다. 첫 예산을 저장하거나 지출을 추가하거나 ‘내 기록 시작’을 누르면 예시 내역을 비우고 개인 기록을 시작합니다.
+[http://localhost:3000](http://localhost:3000)에서 확인합니다. Supabase Auth와 DB를 설정한 뒤 로그인하면 기록을 조회하고 저장할 수 있습니다.
 
 ## 화면과 기능
 
@@ -38,22 +38,22 @@ npm run dev
 3. `npm run db:deploy`로 준비된 마이그레이션을 적용합니다.
 4. 개발 서버를 다시 실행합니다.
 
-`DATABASE_URL`은 앱 실행용 pooler, `DIRECT_URL`은 마이그레이션용 연결입니다. 비밀번호의 특수 문자는 URL 인코딩합니다. 이 값들은 브라우저로 전달하지 않습니다. 별도의 Supabase public key나 service role key는 필요하지 않습니다.
+`DATABASE_URL`은 앱 실행용 pooler, `DIRECT_URL`은 마이그레이션용 연결입니다. 비밀번호의 특수 문자는 URL 인코딩합니다. 이 값들은 브라우저로 전달하지 않습니다. 로그인에는 `NEXT_PUBLIC_SUPABASE_URL`과 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`를 사용합니다. service role 키는 필요하지 않습니다.
 
-`pocket` 전용 스키마에 `Pocket`과 `Expense` 테이블을 만들며 Supabase Data API의 노출 스키마에 추가하지 않습니다. 예시 내역은 서버에 저장하지 않습니다. 접속 정보가 없으면 로컬 저장을 유지하며, 서버 저장 실패·동시 수정 충돌은 화면에 표시합니다.
+`pocket` 스키마는 Supabase Data API에 노출하지 않습니다. 앱 테이블에는 RLS를 켜고 클라이언트 역할의 접근 권한을 부여하지 않습니다. Next.js API가 Supabase Auth 사용자를 검증한 뒤, 서버의 Prisma 연결로 해당 계정 보관함만 조회·저장합니다.
 
-현재는 로그인 없는 개인용입니다. 임의의 HttpOnly 쿠키로 브라우저별 보관함을 구분합니다. **다른 기기에서 자동으로 같은 기록을 열 수 없으며, 쿠키를 지우면 기존 서버 기록에 다시 접근할 수 없습니다.** 로그인을 추가할 때 이 보관함을 계정과 연결할 수 있습니다.
+브라우저 캐시는 로그인한 계정별로 나눕니다. 이전 익명 보관함과 브라우저 기록은 새 계정으로 자동 합치지 않습니다.
 
 ### API
 
 | 메서드 | 경로 | 동작 |
 | --- | --- | --- |
-| GET | `/api/pocket` | 이 브라우저의 전체 기록과 변경 버전 조회, 최초 보관함 쿠키 발급 |
+| GET | `/api/pocket` | 인증된 계정의 기록과 변경 버전 조회 |
 | PUT | `/api/pocket` | 예산·설정·지출 전체를 한 트랜잭션으로 저장 |
 
-PUT 본문은 `{ data: PocketData, revision: number }`입니다. 최신 `revision`이 일치할 때만 저장합니다. 오래된 버전은 409로 거부해 다른 탭의 변경을 덮어쓰지 않습니다. 금액·날짜·카테고리·중복 ID와 같은 출처의 JSON 요청인지 확인합니다. 내역은 보관함당 최대 10,000건, 요청은 최대 2MB입니다.
+GET·PUT에는 현재 화면의 계정을 나타내는 `x-pocket-account` 헤더가 필요합니다. 서버는 Supabase에서 확인한 사용자와 이 값이 일치할 때만 처리합니다. PUT 본문은 `{ data: PocketData, revision: number }`입니다. 최신 `revision`이 일치할 때만 저장합니다. 오래된 버전은 409로 거부해 다른 탭의 변경을 덮어쓰지 않습니다. 금액·날짜·카테고리·중복 ID와 같은 출처의 JSON 요청인지 확인합니다. 내역은 보관함당 최대 10,000건, 요청은 최대 2MB입니다.
 
-로컬 캐시는 `dal-pocket-v1`, 동기화 상태는 `dal-pocket-sync-v1`에 저장됩니다. 충돌 후 ‘서버 기록 불러오기’를 누르면 기존 로컬 사본은 `dal-pocket-local-backup`에 보관됩니다.
+로컬 캐시와 충돌 백업 키에는 계정 식별자를 붙입니다.
 
 ## Vercel과 브랜치
 

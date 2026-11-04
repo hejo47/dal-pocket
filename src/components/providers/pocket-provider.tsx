@@ -6,16 +6,15 @@ import type { ReactNode } from "react";
 import { CATEGORIES, getPeriod, getPeriodExpenses, todayInSeoul } from "@/lib/pocket";
 import { financeOf, financeSummary } from "@/lib/finance";
 import type { Finance, MoneyEntry, Payment } from "@/lib/finance";
-import type { BudgetMode, Category, Expense, FontPreferences } from "@/lib/pocket";
-import { getServerSnapshot, getSnapshot, loadServerCopy, retryCloud, subscribe, updatePocket } from "@/lib/pocket-storage";
+import type { BudgetMode, Category, Expense, FontPreferences, PocketData } from "@/lib/pocket";
+import { getServerSnapshot, getSnapshot, loadServerCopy, retryCloud, subscribe, updatePocket as updateStoredPocket } from "@/lib/pocket-storage";
 
 export type ExpenseDraft = { amount: string; category: Category; date: string; memo: string; payment?: Payment; splitInput?: string };
 type EditorState = { planId?: string; open: boolean; expenseId: string | null; draft: ExpenseDraft };
 type Notice = { message: string; action?: { label: string; onClick: () => void } } | null;
 const emptyDraft = (today: string, category: string = CATEGORIES[0]): ExpenseDraft => ({ amount: "", category, date: today, memo: "", payment: { gross: 0, split: 1, method: "card", settled: false, settledDate: today } });
 
-function usePocketController() {
-  const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+function usePocketController(snapshot: ReturnType<typeof getSnapshot>) {
   const { data, today, ready, storage } = snapshot;
   const period = getPeriod(data.mode, data.weekStartsOn, today);
   const expenses = getPeriodExpenses(data.expenses, period);
@@ -26,6 +25,10 @@ function usePocketController() {
   const dismissNotice = useCallback(() => setNotice(null), []);
   const [editor, setEditor] = useState<EditorState>({ open: false, expenseId: null, draft: emptyDraft("2000-01-01") });
   const returnFocus = useRef<HTMLElement | null>(null);
+
+  function updatePocket(updater: (data: PocketData) => PocketData, options?: { sync?: boolean }) {
+    return updateStoredPocket(snapshot.accountVersion, updater, options);
+  }
 
   function notify(message: string, persisted = true) {
     setNotice({ message: persisted ? message : `${message} 브라우저 저장을 사용할 수 없어 새로고침하면 사라질 수 있습니다.` });
@@ -143,7 +146,12 @@ type PocketContextValue = ReturnType<typeof usePocketController>;
 const PocketContext = createContext<PocketContextValue | null>(null);
 
 export function PocketProvider({ children }: { children: ReactNode }) {
-  const value = usePocketController();
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  return <PocketScope key={snapshot.accountVersion} snapshot={snapshot}>{children}</PocketScope>;
+}
+
+function PocketScope({ children, snapshot }: { children: ReactNode; snapshot: ReturnType<typeof getSnapshot> }) {
+  const value = usePocketController(snapshot);
   return <PocketContext.Provider value={value}>{children}</PocketContext.Provider>;
 }
 
