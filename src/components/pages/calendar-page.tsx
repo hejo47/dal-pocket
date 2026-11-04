@@ -43,7 +43,7 @@ function CalendarView() {
   const weekdays = Array.from({ length: 7 }, (_, index) => WEEKDAYS[(pocket.data.weekStartsOn + index) % 7]);
   const monthLabel = `${Number(month.slice(0, 4))}년 ${Number(month.slice(5, 7))}월`;
   return <div className="flex w-full max-w-content flex-col gap-6">
-    <ScreenTitle title="소비 달력" action={<PillButton variant="outline" size="sm" onClick={() => { setMonth(pocket.today.slice(0, 7)); setSelected(pocket.today); }}>오늘</PillButton>} />
+    <ScreenTitle title="소비 달력" />
     <PeriodPicker date={month + "-01"} onChange={(date) => {
       const next = date.slice(0, 7);
       setMonth(next);

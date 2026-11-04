@@ -20,9 +20,8 @@ export function SavingsSection({ month }: { month: string }) {
   const [date, setDate] = useState(pocket.today);
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
-  return <SectionCard title="저축" action={<IconButton label={open ? "저축 등록 닫기" : "저축 기록 추가"} aria-expanded={open} onClick={() => setOpen((value) => !value)}>{open ? <X /> : <Plus />}</IconButton>}>
-    <p className="text-xs text-black-030">이달 순저축</p><p className="font-numbers text-2xl font-semibold">{formatMoney(flow.savedMonth - flow.withdrawnMonth)}원</p>
-    <div className="flex flex-col gap-1 text-sm"><p>이달 저축 {formatMoney(flow.savedMonth)}원</p><p>이달 인출 {formatMoney(flow.withdrawnMonth)}원</p></div>
+  return <SectionCard title="저축" summary={{ label: "이달 순저축", amount: flow.savedMonth - flow.withdrawnMonth }} action={<IconButton label={open ? "저축 등록 닫기" : "저축 기록 추가"} aria-expanded={open} onClick={() => setOpen((value) => !value)}>{open ? <X /> : <Plus />}</IconButton>}>
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs leading-150 text-black-030"><p>이달 저축 {formatMoney(flow.savedMonth)}원</p><p>이달 인출 {formatMoney(flow.withdrawnMonth)}원</p></div>
     {open && <form className="flex min-w-0 flex-col gap-3 rounded-lg bg-black-002 p-3" onSubmit={(event) => {
       event.preventDefault(); const parsed = parseAmount(amount); if (!validAmount(parsed)) return;
       pocket.saveFinance({ ...finance, savings: [...(finance.savings ?? []), { id: crypto.randomUUID(), date, amount: parsed, memo, direction }] });
