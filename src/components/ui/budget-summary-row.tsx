@@ -5,7 +5,7 @@ import { InfoPopover } from "@/components/ui/info-popover";
 import { formatMoney } from "@/lib/pocket";
 
 export function BudgetSummaryRow({ title, amount, action, children }: {
-  title: string; amount: number | null; action: ReactNode; children?: ReactNode;
+  title: string; amount: number | null; action?: ReactNode; children?: ReactNode;
 }) {
   return <section aria-label={title} className="flex min-w-0 flex-col">
     <div className="flex min-w-0 items-center gap-2">
@@ -14,7 +14,7 @@ export function BudgetSummaryRow({ title, amount, action, children }: {
         {children && <InfoPopover label={`${title} 상세`}>{children}</InfoPopover>}
       </div>
       <p className="font-numbers ml-auto min-w-0 break-all text-base font-semibold leading-150">{amount === null ? "??" : formatMoney(amount)}<span className="text-xs font-medium">원</span></p>
-      <div className="shrink-0">{action}</div>
+      {action && <div className="shrink-0">{action}</div>}
     </div>
   </section>;
 }

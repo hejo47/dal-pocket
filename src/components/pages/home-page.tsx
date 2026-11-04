@@ -10,13 +10,14 @@ import { BudgetSummaryRow } from "@/components/ui/budget-summary-row";
 import { MoneyRow } from "@/components/ui/money-row";
 
 import { useState } from "react";
-import { CalendarPlus, SquarePen } from "lucide-react";
+import { List, SquarePen } from "lucide-react";
 
 import { SignInNotice } from "@/components/ui/sign-in-notice";
 import { HomePlans } from "@/components/pages/home-plans";
 import { ExpenseList } from "@/components/pages/expense-list";
 import { usePocket } from "@/components/providers/pocket-provider";
 import { PageSkeleton, ScreenTitle } from "@/components/ui/screen-title";
+import { IconContainer } from "@/components/ui/icon-container";
 import { PillButton } from "@/components/ui/pill-button";
 
 import { dailySpendingAllowance, financeSummary, foodBudgetSummary } from "@/lib/finance";
@@ -106,7 +107,7 @@ export function HomePage({ masked = false, checkingAuth = false }: { masked?: bo
         </dl>
       </div>
     <div className="flex flex-col" aria-label="항목별 예산">
-      <BudgetSummaryRow title={!masked && food.remaining < 0 ? "식비 초과" : "남은 식비"} amount={masked ? null : food.configured ? Math.abs(food.remaining) : 0} action={<IconLink href={budgetHref} label="식비 설정"><SquarePen /></IconLink>}>
+      <BudgetSummaryRow title={!masked && food.remaining < 0 ? "식비 초과" : "남은 식비"} amount={masked ? null : food.configured ? Math.abs(food.remaining) : 0}>
         {!masked && (food.configured ? <>
           <div className="flex flex-col gap-3 pt-2"><dl><MoneyRow label="배정 식비" amount={food.budget} /><MoneyRow label="사용한 식비" amount={food.spent} /></dl>{food.carriedIn > 0 && <p className="text-xs leading-160 text-black-030">이전 주에 남긴 {formatMoney(food.carriedIn)}원을 더한 예산입니다.</p>}{food.carried > 0 && <p className="text-xs leading-160 text-black-030">이전 주에서 끌어 쓴 {formatMoney(food.carried)}원을 차감한 예산입니다.</p>}{food.nextPeriod && <div className="flex flex-col gap-2 border-t border-black-010 pt-3"><dl><MoneyRow label="다음 주 예상 식비" amount={food.nextBudget ?? 0} /></dl><p className="text-sm leading-160 text-black-030">(기본 {formatMoney(food.nextBase ?? 0)}원{food.nextAdjustment !== 0 ? " · " + (food.nextAdjustment > 0 ? "미사용액 " : "초과분 ") + formatMoney(Math.abs(food.nextAdjustment)) + (food.nextAdjustment > 0 ? "원 가산" : "원 차감") : ""})</p><p className="text-xs leading-160 text-black-030">이번 주 남은 금액 기준이며, 추가 지출에 따라 바뀝니다.</p>{food.borrowed > 0 && <p className="text-xs leading-160 text-black-030">이번 주 초과분 {formatMoney(food.borrowed)}원을 다음 주 식비에서 자동으로 끌어 씁니다.</p>}</div>}{!food.nextPeriod && food.borrowed > 0 && <p className="text-xs text-black-030">이 기간 식비 초과 {formatMoney(food.borrowed)}원</p>}<p className="text-xs leading-160 text-black-030">식비 분류와 자취 식료품으로 체크한 기록을 합산합니다.</p></div>
         </> : <p className="text-xs leading-150 text-black-030">예산 설정에서 식비를 배정해주세요.</p>)}
@@ -115,7 +116,7 @@ export function HomePage({ masked = false, checkingAuth = false }: { masked?: bo
     </div>
       {masked && <SignInNotice checking={checkingAuth}>로그인하면 내 금액과 지출 내역을 볼 수 있어요.</SignInNotice>}
     </section>
-    <section className="flex flex-col gap-2"><div className="flex items-center justify-between gap-3"><div className="flex flex-wrap items-center gap-2"><h2 className="text-sm font-semibold leading-150">{dailyView ? `${selectedMonth}월 ${selectedDay}일` : data.mode === "weekly" ? `${selectedMonth}월 ${period.weekNumber}주차` : `${selectedMonth}월`} 지출</h2><span className="font-numbers text-xs leading-150 text-black-030">{amountText(sumExpenses(periodExpenses))}원 · 전체 {masked ? "??" : periodExpenses.length}건</span></div><IconLink href={masked ? "/account" : "/expenses"} label="내역 관리"><CalendarPlus /></IconLink></div>{masked ? <div className="rounded-xl border border-black-010 bg-black-002 px-3 py-4 text-sm text-black-030">로그인 후 내역을 볼 수 있어요.</div> : <ExpenseList expenses={periodExpenses.slice(0, visibleCount)} grouped />}{!masked && visibleCount < periodExpenses.length && <PillButton variant="outline" className="w-full" onClick={() => setVisibleExpenses({ period: periodKey, count: visibleCount + 8 })}>더보기 · {Math.min(visibleCount, periodExpenses.length)}/{periodExpenses.length}건</PillButton>}</section>
+    <section className="flex flex-col gap-2"><div className="flex items-center justify-between gap-3"><div className="flex flex-wrap items-center gap-2"><h2 className="text-sm font-semibold leading-150">{dailyView ? `${selectedMonth}월 ${selectedDay}일` : data.mode === "weekly" ? `${selectedMonth}월 ${period.weekNumber}주차` : `${selectedMonth}월`} 지출</h2><span className="font-numbers text-xs leading-150 text-black-030">{amountText(sumExpenses(periodExpenses))}원 · 전체 {masked ? "??" : periodExpenses.length}건</span></div><PillButton variant="ghost" size="sm" href={masked ? "/account" : `/expenses?date=${selectedDate}&category=${encodeURIComponent("전체")}`}><IconContainer><List /></IconContainer>전체 내역</PillButton></div>{masked ? <div className="rounded-xl border border-black-010 bg-black-002 px-3 py-4 text-sm text-black-030">로그인 후 내역을 볼 수 있어요.</div> : <ExpenseList expenses={periodExpenses.slice(0, visibleCount)} grouped />}{!masked && visibleCount < periodExpenses.length && <PillButton variant="outline" className="w-full" onClick={() => setVisibleExpenses({ period: periodKey, count: visibleCount + 8 })}>더보기 · {Math.min(visibleCount, periodExpenses.length)}/{periodExpenses.length}건</PillButton>}</section>
 
   </div>;
 }

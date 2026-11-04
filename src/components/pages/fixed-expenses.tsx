@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { SectionCard } from "@/components/ui/section-card";
+import { IconButton } from "@/components/ui/icon-button";
+import { Pencil, Trash2, Plus, X } from "lucide-react";
 import { IconContainer } from "@/components/ui/icon-container";
 import { usePocket } from "@/components/providers/pocket-provider";
 import { DateField, FieldLabel, FieldHint, SelectField, TextField } from "@/components/ui/form-field";
@@ -36,6 +38,7 @@ export function FixedExpenses({ month }: { month: string }) {
   const pocket = usePocket();
   const finance = financeOf(pocket.data);
   const items = finance.fixedExpenses ?? [];
+  const [expanded, setExpanded] = useState(false);
   const [activeForm, setActiveForm] = useState<string | null>(null);
   const editing = items.find((item) => item.id === activeForm);
   const [memo, setMemo] = useState("");
@@ -47,6 +50,7 @@ export function FixedExpenses({ month }: { month: string }) {
   const [sessions, setSessions] = useState("4");
   const methodOptions = [{ value: "cash", label: "현금·체크카드 (즉시 출금)" }, { value: "card", label: "신용카드 (카드 결제일 출금)" }];
   function openForm(item?: FixedExpense) {
+    setExpanded(true);
     setMemo(item?.memo ?? "");
     setAmount(item ? String(item.amount) : "");
     setDate(item?.date ?? pocket.today);
@@ -80,8 +84,7 @@ export function FixedExpenses({ month }: { month: string }) {
       </div>
     </form>;
 
-  return <section className="flex min-w-0 flex-col gap-4 rounded-xl border border-black-020 p-4">
-    <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">고정 지출</h2><PillButton variant="outline" size="sm" aria-expanded={activeForm === ""} onClick={() => activeForm === "" ? setActiveForm(null) : openForm()}>{activeForm === "" ? "접기" : "고정 내역 추가"}</PillButton></div>
+  return <SectionCard title="고정 지출" expanded={expanded} onToggle={() => setExpanded(!expanded)} action={<IconButton label={activeForm === "" ? "고정 내역 등록 닫기" : "고정 내역 추가"} onClick={() => activeForm === "" ? setActiveForm(null) : openForm()}>{activeForm === "" ? <X /> : <Plus />}</IconButton>}>
     {activeForm === "" && form}
     {items.length ? items.map((item) => <div key={item.id} className="flex min-w-0 flex-col gap-3 border-t border-black-010 py-3"><div className="flex items-center justify-between gap-3"><div className="flex min-w-0 flex-col gap-1"><p className="break-words text-sm">{item.memo}</p><p className="font-numbers text-sm">{item.cadence === "sessions" ? (item.sessionsPerPayment ?? 4) + "회분" : "매월"} <strong className="text-base font-semibold">{formatMoney(item.amount)}원</strong></p><p className="text-xs leading-160 text-black-030">{item.date}부터 {item.cadence === "sessions" ? "수강 횟수로 관리" : item.endMonth ? item.endMonth + "까지" : "반복"} · 생활 예산 제외</p>{item.cadence !== "sessions" && <p className="text-xs text-black-030">{fixedDueDate(item, month) ? month + " 카드 사용·현금 결제일: " + fixedDueDate(item, month) : month + "에는 적용되지 않음"}</p>}</div><div className="flex shrink-0 gap-1">
       <PillButton type="button" variant="ghost" size="icon" aria-label={item.memo + " 수정"} title="수정" aria-expanded={activeForm === item.id} onClick={() => activeForm === item.id ? setActiveForm(null) : openForm(item)}><IconContainer><Pencil /></IconContainer></PillButton>
@@ -95,5 +98,5 @@ export function FixedExpenses({ month }: { month: string }) {
       {activeForm === item.id && form}
       {item.cadence === "sessions" && <SessionRecords item={item} />}
     </div>) : <FieldHint>등록된 고정 내역이 없습니다.</FieldHint>}
-  </section>;
+  </SectionCard>;
 }

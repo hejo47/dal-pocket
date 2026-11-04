@@ -1,5 +1,6 @@
 "use client";
 
+import { PlanBudget } from "@/components/pages/plan-budget";
 import { PeriodPicker } from "@/components/ui/period-picker";
 
 import { useSearchParams } from "next/navigation";
@@ -58,6 +59,7 @@ function BudgetView({ initialMonth }: { initialMonth: string }) {
     <PeriodPicker date={month + "-01"} onChange={(date) => setMonth(date.slice(0, 7))} />
     <ScreenTitle title={daily ? "일간 예산" : pocket.data.mode === "weekly" ? "주간 예산" : "월간 예산"} subtitle={daily ? "하루에 쓸 금액을 입력하세요" : pocket.data.mode === "weekly" ? "주당 금액을 입력하세요" : "월 총액을 주별로 나눠 편성합니다"} />
     <BudgetForm daily={daily} key={`${daily}-${month}-${pocket.data.mode}-${setting.budget}-${setting.groceries}`} month={month} />
+    <PlanBudget key={month} month={month} />
   </div>;
 }
 
