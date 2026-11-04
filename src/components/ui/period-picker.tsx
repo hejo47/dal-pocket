@@ -32,7 +32,7 @@ export function PeriodPicker({ mode = "monthly", date, maxDate, weekStartsOn = 1
       <div className="min-w-0 flex-1">
         <DateField mode={monthly ? "month" : "day"} aria-label={monthly ? "조회할 달" : daily ? "조회할 날짜" : "조회할 주"}
           value={monthly ? date.slice(0, 7) : date} max={monthly ? maxDate?.slice(0, 7) : maxDate} onValueChange={select} required
-          triggerLabel={monthly || daily ? undefined : `${Number(period.start.slice(5, 7))}월 ${period.weekNumber}주차 (${period.label})`} />
+          triggerLabel={monthly || daily ? undefined : `${Number(period.start.slice(5, 7))}월 ${period.weekNumber}주차`} />
       </div>
       <PillButton type="button" variant="outline" size="icon" className="shrink-0" aria-label={`다음 ${unit}`} disabled={Boolean(maxDate && end >= maxDate)} onClick={() => select(offsetDate(end, 1))}>
         <IconContainer size="slg"><ChevronRight /></IconContainer>

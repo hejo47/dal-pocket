@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { setPocketAccount } from "@/lib/pocket-storage";
 import { hasSupabaseAuthConfig } from "@/lib/supabase/config";
-import { CalendarDays, ChartNoAxesCombined, House, NotebookPen, Plus, UserRound, WalletCards } from "lucide-react";
+import { CalendarDays, ChartNoAxesCombined, House, NotebookPen, Plus, UserRound } from "lucide-react";
 
 import { ExpensesPreview } from "@/components/pages/expenses-page";
 import { SignedOutPage } from "@/components/pages/signed-out-page";
@@ -72,7 +72,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return <div className="mx-auto flex min-h-dvh w-full max-w-page flex-col border-x border-black-010 bg-white">
     <a href="#main-content" className="sr-only focus:not-sr-only focus:px-6 focus:py-3">본문 바로가기</a>
     <header className="flex flex-col gap-4 border-b border-black-010 px-6 pt-5 pb-4">
-      <div className="flex items-center justify-between gap-4"><Link href="/" className="font-pretendard tracking-pt text-base font-semibold leading-150">달주머니</Link><div className="flex items-center gap-2"><IconLink href="/analysis" label="분석·현금 흐름"><WalletCards /></IconLink><IconLink href="/account" label="계정"><UserRound /></IconLink></div></div>
+      <div className="flex items-center justify-between gap-4"><Link href="/" className="font-pretendard tracking-pt text-base font-semibold leading-150">달주머니</Link><div className="flex items-center gap-2"><IconLink href="/account" label="계정"><UserRound /></IconLink></div></div>
       {pathname === "/" || pathname === "/budget" ? <ModeButtons />
         : pathname === "/expenses" ? <Suspense fallback={<ModeButtons />}><ExpenseModeButtons /></Suspense> : null}
     </header>

@@ -3,7 +3,7 @@ import type { ComponentProps, ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 
-type Common = { children: ReactNode; className?: string; variant?: "filled" | "outline" | "ghost"; size?: "default" | "sm" | "icon" };
+type Common = { children: ReactNode; className?: string; variant?: "filled" | "outline" | "ghost" | "soft"; size?: "default" | "sm" | "icon" };
 type Action = Common & Omit<ComponentProps<"button">, keyof Common> & { href?: never };
 type Navigation = Common & { href: string; onClick?: never; disabled?: never };
 

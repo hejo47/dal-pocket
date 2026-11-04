@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { IconContainer } from "@/components/ui/icon-container";
-import { isDateKey, todayInSeoul } from "@/lib/pocket";
+import { isDateKey, shortDate, todayInSeoul } from "@/lib/pocket";
 import { cn } from "@/lib/utils";
 
 import "@daypicker/react/style.css";
@@ -45,7 +45,7 @@ export function DateField({
   const today = localDate(todayInSeoul());
   const unavailable = [...(first ? [{ before: first }] : []), ...(last ? [{ after: last }] : [])];
 
-  const display = monthly && date ? `${Number(date.slice(0, 4))}년 ${Number(date.slice(5, 7))}월` : date;
+  const display = monthly && date ? `${Number(date.slice(0, 4))}년 ${Number(date.slice(5, 7))}월` : isDateKey(date) ? shortDate(date) : "";
   const title = label ?? (monthly ? "월 선택" : "날짜 선택");
 
   function choose(value: string) {
@@ -66,6 +66,13 @@ export function DateField({
       <div className="pocket-dialog-scroll">
         {monthly ? <MonthOptions value={date} min={min} max={max} onSelect={choose} /> : <DayPicker
           className="pocket-date-picker"
+          styles={{
+            months: { width: "100%", maxWidth: "none" },
+            month: { width: "100%" },
+            month_grid: { width: "100%", tableLayout: "fixed" },
+            day: { width: "calc(100% / 7)" },
+            day_button: { marginInline: "auto", maxWidth: "100%" },
+          }}
           locale={ko}
           mode="single"
           required

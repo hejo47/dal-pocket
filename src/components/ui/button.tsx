@@ -10,6 +10,7 @@ const buttonVariants = cva(
   { variants: {
     variant: {
       default: "border-transparent bg-black-100 text-white hover:bg-black-030",
+      soft: "border-transparent bg-black-005 text-black-100 hover:bg-black-010 active:bg-black-030",
       outline: "border-black-010 bg-white text-black-100 shadow-xs hover:bg-black-002 active:bg-black-005",
       ghost: "border-transparent bg-transparent text-black-100 hover:bg-black-005 active:bg-black-010",
       link: "border-transparent text-black-100 underline underline-offset-4",
