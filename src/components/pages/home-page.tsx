@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { IconLink } from "@/components/ui/icon-link";
 
 import { InfoPopover } from "@/components/ui/info-popover";
@@ -10,14 +11,13 @@ import { BudgetSummaryRow } from "@/components/ui/budget-summary-row";
 import { MoneyRow } from "@/components/ui/money-row";
 
 import { useState } from "react";
-import { List, SquarePen } from "lucide-react";
+import { SquarePen } from "lucide-react";
 
 import { SignInNotice } from "@/components/ui/sign-in-notice";
 import { HomePlans } from "@/components/pages/home-plans";
 import { ExpenseList } from "@/components/pages/expense-list";
 import { usePocket } from "@/components/providers/pocket-provider";
 import { PageSkeleton, ScreenTitle } from "@/components/ui/screen-title";
-import { IconContainer } from "@/components/ui/icon-container";
 import { PillButton } from "@/components/ui/pill-button";
 
 import { dailySpendingAllowance, financeSummary, foodBudgetSummary } from "@/lib/finance";
@@ -116,7 +116,7 @@ export function HomePage({ masked = false, checkingAuth = false }: { masked?: bo
     </div>
       {masked && <SignInNotice checking={checkingAuth}>로그인하면 내 금액과 지출 내역을 볼 수 있어요.</SignInNotice>}
     </section>
-    <section className="flex flex-col gap-2"><div className="flex items-center justify-between gap-3"><div className="flex flex-wrap items-center gap-2"><h2 className="text-sm font-semibold leading-150">{dailyView ? `${selectedMonth}월 ${selectedDay}일` : data.mode === "weekly" ? `${selectedMonth}월 ${period.weekNumber}주차` : `${selectedMonth}월`} 지출</h2><span className="font-numbers text-xs leading-150 text-black-030">{amountText(sumExpenses(periodExpenses))}원 · 전체 {masked ? "??" : periodExpenses.length}건</span></div><PillButton variant="ghost" size="sm" href={masked ? "/account" : `/expenses?date=${selectedDate}&category=${encodeURIComponent("전체")}`}><IconContainer><List /></IconContainer>전체 내역</PillButton></div>{masked ? <div className="rounded-xl border border-black-010 bg-black-002 px-3 py-4 text-sm text-black-030">로그인 후 내역을 볼 수 있어요.</div> : <ExpenseList expenses={periodExpenses.slice(0, visibleCount)} grouped />}{!masked && visibleCount < periodExpenses.length && <PillButton variant="outline" className="w-full" onClick={() => setVisibleExpenses({ period: periodKey, count: visibleCount + 8 })}>더보기 · {Math.min(visibleCount, periodExpenses.length)}/{periodExpenses.length}건</PillButton>}</section>
+    <section className="flex flex-col gap-2"><div className="flex items-center justify-between gap-3"><div className="flex flex-wrap items-center gap-2"><h2 className="text-sm font-semibold leading-150">{dailyView ? `${selectedMonth}월 ${selectedDay}일` : data.mode === "weekly" ? `${selectedMonth}월 ${period.weekNumber}주차` : `${selectedMonth}월`} 지출</h2><span className="font-numbers text-xs leading-150 text-black-030">{amountText(sumExpenses(periodExpenses))}원 · 전체 {masked ? "??" : periodExpenses.length}건</span></div><Link className="shrink-0 py-2 text-xs font-medium leading-150 text-black-030 underline underline-offset-4 hover:text-black-100" href={masked ? "/account" : `/expenses?date=${selectedDate}&category=${encodeURIComponent("전체")}`}>전체 내역</Link></div>{masked ? <div className="rounded-xl border border-black-010 bg-black-002 px-3 py-4 text-sm text-black-030">로그인 후 내역을 볼 수 있어요.</div> : <ExpenseList expenses={periodExpenses.slice(0, visibleCount)} grouped />}{!masked && visibleCount < periodExpenses.length && <PillButton variant="outline" className="w-full" onClick={() => setVisibleExpenses({ period: periodKey, count: visibleCount + 8 })}>더보기 · {Math.min(visibleCount, periodExpenses.length)}/{periodExpenses.length}건</PillButton>}</section>
 
   </div>;
 }
