@@ -1,5 +1,7 @@
 "use client";
 
+import { SquarePen } from "lucide-react";
+import { IconContainer } from "@/components/ui/icon-container";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { usePocket } from "@/components/providers/pocket-provider";
@@ -9,7 +11,7 @@ import { PillButton } from "@/components/ui/pill-button";
 import { financeOf } from "@/lib/finance";
 import { formatMoney, isDateKey, parseAmount, validAmount } from "@/lib/pocket";
 
-export function HomePlans({ date }: { date: string }) {
+export function HomePlans({ date, amount }: { date: string; amount: number }) {
   const pocket = usePocket();
   const [open, setOpen] = useState(false);
   const [planDate, setPlanDate] = useState(date);
@@ -33,7 +35,10 @@ export function HomePlans({ date }: { date: string }) {
 
   return <div className="flex min-w-0 flex-col gap-2">
     <Dialog open={open} onOpenChange={(next) => { setOpen(next); setError(""); if (next) setPlanDate(date); }}>
-      <DialogTrigger asChild><PillButton type="button" variant="outline" size="sm" className="self-start">약속 비용 설정</PillButton></DialogTrigger>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm">약속 예산 <span className="font-numbers font-semibold">{formatMoney(amount)}원</span></p>
+        <DialogTrigger asChild><PillButton type="button" variant="ghost" size="icon" aria-label="약속 비용 설정" title="약속 비용 설정"><IconContainer size="slg"><SquarePen /></IconContainer></PillButton></DialogTrigger>
+      </div>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>약속 비용 설정</DialogTitle>

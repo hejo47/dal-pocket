@@ -7,8 +7,7 @@ import { PeriodPicker } from "@/components/ui/period-picker";
 import { MoneyRow } from "@/components/ui/money-row";
 
 import { useState } from "react";
-import { ArrowDownToLine, CalendarPlus, SquarePen } from "lucide-react";
-import { IconContainer } from "@/components/ui/icon-container";
+import { CalendarPlus, SquarePen } from "lucide-react";
 
 import { SignInNotice } from "@/components/ui/sign-in-notice";
 import { HomePlans } from "@/components/pages/home-plans";
@@ -59,19 +58,20 @@ export function HomePage({ masked = false, checkingAuth = false }: { masked?: bo
     <PeriodPicker mode={dailyView ? "daily" : data.mode} date={selectedDate} maxDate={today} weekStartsOn={data.weekStartsOn} onChange={(date) => setViewDate(date.slice(0, 7) === today.slice(0, 7) && !dailyView && data.mode === "monthly" ? null : date)} />
     <section aria-label="예산 현황" className="flex flex-col gap-5 border-b border-black-010 pb-6">
       <div className="flex flex-col gap-1"><p className="text-sm leading-150 text-black-030">{daily ? (selectedDate === today ? "오늘 더 쓸 수 있는 금액" : "이날 더 쓸 수 있었던 금액") : !masked && remaining < 0 ? "예산 초과 금액" : "남은 예산"}</p><p className="font-numbers break-all text-4xl font-semibold leading-130 text-black-100">{amountText(Math.abs(remaining))}<span className="text-xl font-medium">원</span></p></div>
+      {!masked && !dailyView && data.mode === "weekly" && (
+        <p className="text-xs leading-150 text-black-030">
+          {summary.carriedIn || summary.carried
+            ? `이전 주 이월 +${formatMoney(summary.carriedIn)}원 · 차감 −${formatMoney(summary.carried)}원`
+            : "이전 주 이월/차감 없음"}
+        </p>
+      )}
       {!masked && budget > 0 && remaining >= 0 && remaining <= 1000 && (
         <p className="rounded-lg bg-black-002 px-3 py-2 text-sm leading-150">이 금액이면 그냥 아끼고 다음 주에 몰아 쓰시죠ㅋ</p>
       )}
       {daily ? <p className="font-numbers text-sm leading-160 text-black-030">(주 예산 잔액 {amountText(daily.remaining)}원 − 남은 약속 {amountText(daily.reserved)}원) ÷ 선택일 포함 {daily.days}일</p> : <div className="flex flex-col gap-2"><div role="progressbar" aria-label="예산 사용률" aria-valuemin={0} aria-valuemax={100} aria-valuenow={masked ? undefined : Math.min(100, usedPercent)} aria-valuetext={masked ? "로그인 후 확인" : `${usedPercent}% 사용`} className="flex h-1.5 overflow-hidden rounded-full bg-black-002"><span className="bg-black-100 transition-all" style={{ width: masked ? "0%" : `${Math.min(100, usedPercent)}%` }} /></div><div className="flex items-center justify-between gap-3 text-xs leading-150 text-black-030"><span>예산의 {masked ? "??" : usedPercent}% 사용</span><span>{period.label}</span></div></div>}
       <dl className="flex flex-wrap gap-3"><div className="flex min-w-0 flex-1 flex-col gap-2 rounded-lg bg-black-002 px-4 py-4"><dt className="text-xs leading-150 text-black-030">사용한 금액</dt><dd className="font-numbers break-all text-xl font-semibold leading-140 text-black-100">{amountText(spent)}<span className="text-sm">원</span></dd></div><div className="flex min-w-0 flex-1 flex-col gap-2 rounded-lg bg-black-002 px-4 py-4"><dt className="text-xs leading-150 text-black-030">{daily ? "주 예산 잔액" : data.mode === "weekly" ? "주간 예산" : "월간 예산"}</dt><dd className="font-numbers break-all text-xl font-semibold leading-140 text-black-100">{amountText(daily ? daily.remaining : budget)}<span className="text-sm">원</span></dd></div></dl>
-      {!masked && !dailyView && data.mode === "weekly" && (summary.carriedIn > 0 || summary.carried > 0) && <details className="rounded-lg bg-black-002 px-3 py-2"><summary className="cursor-pointer py-1 text-sm font-semibold">이전 주 이월·차감</summary><dl><MoneyRow label="미사용액 가산" amount={summary.carriedIn} /><MoneyRow label="초과 지출 차감" amount={summary.carried} /></dl></details>}
-      {!masked && reserved > 0 && <dl><MoneyRow label={daily ? "이번 주 남은 약속 비용" : "약속 예산"} amount={reserved} /></dl>}
-      {masked ? <SignInNotice checking={checkingAuth}>로그인하면 내 금액과 지출 내역을 볼 수 있어요.</SignInNotice> : <>
-      <PillButton href={`/finance?month=${month}#register-income`} variant="outline" size="sm" className="self-start">
-        <IconContainer size="sm"><ArrowDownToLine /></IconContainer>수입 등록
-      </PillButton>
-      <HomePlans key={selectedDate} date={selectedDate} />
-      </>}
+      {masked ? <SignInNotice checking={checkingAuth}>로그인하면 내 금액과 지출 내역을 볼 수 있어요.</SignInNotice>
+        : <HomePlans key={selectedDate} date={selectedDate} amount={reserved} />}
     </section>
     {!dailyView && <section aria-label="하루 사용 가능액" className="flex flex-col gap-4 rounded-xl border border-black-010 p-4">
       <div className="flex items-center justify-between gap-3"><h2 className="text-sm leading-150">하루 사용 가능액</h2><p className="font-numbers text-xl font-semibold leading-140">{amountText(dailyBudget)}원</p></div>
