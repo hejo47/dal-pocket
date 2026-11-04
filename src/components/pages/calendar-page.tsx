@@ -2,7 +2,6 @@
 
 import { PeriodPicker } from "@/components/ui/period-picker";
 
-import Link from "next/link";
 import { useState } from "react";
 import { Plus, Stamp } from "lucide-react";
 
@@ -46,7 +45,7 @@ function CalendarView() {
       <div className="grid grid-cols-7 gap-1">{weekdays.map((day) => <span key={day} className="pb-2 text-center text-xs leading-150 text-black-030">{day.slice(0, 1)}</span>)}</div>
       {calendar.weeks.map((week) => <div key={week.number} className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-1 rounded-md border border-black-010 bg-white px-3 py-2 text-xs leading-150"><span className="font-semibold">{week.number}주차 예산</span><span className="font-numbers font-semibold">{formatMoney(week.period.start <= pocket.today ? financeSummary(pocket.data, week.period).budget : allocatedBudget(pocket.data, week.period))}원</span></div>
-        <div className="grid grid-cols-7 gap-1">{week.days.map((day) => day.inMonth ? <PillButton key={day.date} variant="ghost" aria-label={`${day.date}, 지출 ${formatMoney(day.amount)}원, ${day.count}건${day.date === pocket.today ? ", 오늘" : ""}${day.count === 0 && stamps.has(day.date) ? ", 무지출 스탬프" : ""}`} aria-pressed={selected === day.date} aria-current={day.date === pocket.today ? "date" : undefined} onClick={() => setSelected(day.date)} className={cn("aspect-square min-w-0 flex-col justify-start gap-1 rounded-lg border px-0 py-2", selected === day.date ? "border-black-100 bg-black-100 text-white hover:bg-black-030 hover:text-white" : day.date === pocket.today ? "border-black-100 bg-white text-black-100" : day.count ? "border-black-010 bg-white text-black-100 hover:bg-black-005" : "border-transparent bg-transparent text-black-030 hover:border-black-010 hover:bg-white")}>
+        <div className="grid grid-cols-7 gap-1">{week.days.map((day) => day.inMonth ? <PillButton key={day.date} variant="ghost" aria-label={`${day.date}, 지출 ${formatMoney(day.amount)}원, ${day.count}건${day.date === pocket.today ? ", 오늘" : ""}${day.count === 0 && stamps.has(day.date) ? ", 무지출 스탬프" : ""}`} aria-pressed={selected === day.date} aria-current={day.date === pocket.today ? "date" : undefined} onClick={() => setSelected(day.date)} className={cn("aspect-square min-w-0 flex-col justify-start gap-1 rounded-lg border px-0 py-2", selected === day.date ? "border-transparent bg-black-100 text-white hover:bg-black-030 hover:text-white" : day.date === pocket.today ? "border-black-010 bg-white text-black-100" : day.count ? "border-black-010 bg-white text-black-100 hover:bg-black-005" : "border-transparent bg-transparent text-black-030 hover:border-black-010 hover:bg-white")}>
           <span className={cn("font-numbers text-sm leading-150", day.date === pocket.today && selected !== day.date && "font-semibold underline underline-offset-4")}>{Number(day.date.slice(8, 10))}</span>
           {day.count > 0 && <span className={cn("font-numbers w-full whitespace-nowrap px-0 text-calendar leading-150", selected === day.date ? "text-white" : "text-black-030")}>{day.amount >= 10000 ? compactMoney.format(day.amount) : formatMoney(day.amount)}</span>}
           {day.count === 0 && stamps.has(day.date)
@@ -63,7 +62,7 @@ function CalendarView() {
       {(stamped || canStamp) && <PillButton type="button" variant="outline" size="sm" className="self-start" aria-pressed={stamped} onClick={toggleStamp}>
         <IconContainer size="sm"><Stamp /></IconContainer>{stamped ? "무지출 스탬프 취소" : "무지출 스탬프 찍기"}
       </PillButton>}
-      <div className="flex flex-col gap-2 rounded-lg border border-black-010 p-3"><div className="flex items-center justify-between gap-2"><h3 className="text-sm">이 날짜 약속 예정</h3><Link href="/finance" className="rounded-lg border border-black-020 px-3 py-2 text-xs">등록·관리</Link></div>{finance.plans.filter((plan)=>plan.date===selected).map((plan)=><p key={plan.id} className="text-sm">{plan.memo || "약속"} · {formatMoney(plan.amount)}원</p>)}</div>
+      <div className="flex flex-col gap-2 rounded-lg border border-black-010 p-3"><div className="flex items-center justify-between gap-2"><h3 className="text-sm">이 날짜 약속 예정</h3><PillButton href={`/finance?month=${month}`} variant="outline" size="sm">등록·관리</PillButton></div>{finance.plans.filter((plan)=>plan.date===selected).map((plan)=><p key={plan.id} className="text-sm">{plan.memo || "약속"} · {formatMoney(plan.amount)}원</p>)}</div>
       <ExpenseList expenses={selectedExpenses} />
     </section>
   </div>;

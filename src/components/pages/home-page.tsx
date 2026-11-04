@@ -5,6 +5,8 @@ import { PeriodPicker } from "@/components/ui/period-picker";
 import { MoneyRow } from "@/components/ui/money-row";
 
 import { useState } from "react";
+import { ArrowDownToLine } from "lucide-react";
+import { IconContainer } from "@/components/ui/icon-container";
 
 import { HomePlans } from "@/components/pages/home-plans";
 import { ExpenseList } from "@/components/pages/expense-list";
@@ -60,6 +62,9 @@ export function HomePage() {
       <dl className="flex flex-wrap gap-3"><div className="flex min-w-0 flex-1 flex-col gap-2 rounded-lg bg-black-002 px-4 py-4"><dt className="text-xs leading-150 text-black-030">사용한 금액</dt><dd className="font-numbers break-all text-xl font-semibold leading-140 text-black-100">{formatMoney(spent)}<span className="text-sm">원</span></dd></div><div className="flex min-w-0 flex-1 flex-col gap-2 rounded-lg bg-black-002 px-4 py-4"><dt className="text-xs leading-150 text-black-030">{daily ? "주 예산 잔액" : data.mode === "weekly" ? "주간 예산" : "월간 예산"}</dt><dd className="font-numbers break-all text-xl font-semibold leading-140 text-black-100">{formatMoney(daily ? daily.remaining : budget)}<span className="text-sm">원</span></dd></div></dl>
       {!dailyView && data.mode === "weekly" && (summary.carriedIn > 0 || summary.carried > 0) && <details className="rounded-lg bg-black-002 px-3 py-2"><summary className="cursor-pointer py-1 text-sm font-semibold">이전 주 이월·차감</summary><dl><MoneyRow label="미사용액 가산" amount={summary.carriedIn} /><MoneyRow label="초과 지출 차감" amount={summary.carried} /></dl></details>}
       {reserved > 0 && <dl><MoneyRow label={daily ? "이번 주 남은 약속 비용" : "약속 예산"} amount={reserved} /></dl>}
+      <PillButton href={`/finance?month=${month}#register-income`} variant="outline" size="sm" className="self-start">
+        <IconContainer size="sm"><ArrowDownToLine /></IconContainer>수입 등록
+      </PillButton>
       <HomePlans key={selectedDate} date={selectedDate} />
     </section>
     {!dailyView && <section aria-label="하루 사용 가능액" className="flex flex-col gap-4 rounded-xl border border-black-010 p-4">
