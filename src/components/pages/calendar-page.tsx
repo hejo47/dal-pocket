@@ -2,6 +2,7 @@
 
 import { DropdownMenu } from "radix-ui";
 import { CalendarPlus, ReceiptText } from "lucide-react";
+import { PlanRecord } from "@/components/pages/plan-record";
 import { PlanEditor } from "@/components/pages/plan-editor";
 import { RecordRemoveButton } from "@/components/ui/record-remove-button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -86,11 +87,10 @@ function CalendarView() {
         </div>
         <div className="pocket-dialog-scroll flex flex-col gap-4">
           {finance.plans.some((plan) => plan.date === selected) && <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold">예정된 약속</h3>
-            {finance.plans.filter((plan) => plan.date === selected).map((plan) => <div key={plan.id} className="flex items-center justify-between gap-2 rounded-lg bg-black-002 p-3">
-              <div className="flex min-w-0 flex-col gap-1"><p className="break-words text-sm font-semibold">{plan.memo || "약속"}</p><p className="font-numbers text-sm">예상 {formatMoney(plan.amount)}원</p></div>
-              <RecordRemoveButton planned label={`${plan.memo || "약속"} 예정 해제`} onClick={() => pocket.saveFinance({ ...finance, plans: finance.plans.filter((entry) => entry.id !== plan.id) })} />
-            </div>)}
+            <h3 className="text-sm font-semibold">약속</h3>
+            {finance.plans.filter((plan) => plan.date === selected).map((plan) => <PlanRecord key={plan.id} plan={plan}
+              onExpenseSelect={(expense) => { setDayOpen(false); pocket.openEditor(expense); }}
+              action={<RecordRemoveButton planned label={`${plan.memo || "약속"} 예정 해제`} onClick={() => pocket.saveFinance({ ...finance, plans: finance.plans.filter((entry) => entry.id !== plan.id) })} />} />)}
           </section>}
           <ExpenseList expenses={selectedExpenses} onSelect={(expense) => { setDayOpen(false); pocket.openEditor(expense); }} />
         </div>

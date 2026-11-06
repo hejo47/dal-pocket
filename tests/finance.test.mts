@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createDemoData, getCalendarMonth, getPeriod, offsetDate } from "../src/lib/pocket.ts";
-import { allocatedBudget, cashFlow, dailySpendingAllowance, settlementSummary, unsettledExpenses, resizeSettlements, fixedDueDate, fixedTotal, foodBudgetSummary, emptyFinance, financeSummary, installmentDue, isFinance, monthSettings } from "../src/lib/finance.ts";
+import { allocatedBudget, cashFlow, dailySpendingAllowance, settlementSummary, unsettledExpenses, resizeSettlements, fixedDueDate, fixedTotal, foodBudgetSummary, emptyFinance, financeSummary, installmentDue, isFinance, monthSettings, planSummary, linkPlanExpenses } from "../src/lib/finance.ts";
 function data() { const value = createDemoData("2026-11-02"); value.expenses=[]; value.isDemo=false; value.finance={...emptyFinance(),months:{"2026-11":{budget:300000,groceries:30000}}}; return value; }
 test("월별 하나의 예산을 모든 짧은 주에 배분해도 합계가 동일하다",()=>{const value=data();const month=getCalendarMonth("2026-11",1,[]);assert.equal(month.weeks.reduce((sum,week)=>sum+allocatedBudget(value,week.period),0),300000);assert.equal(allocatedBudget(value,getPeriod("weekly",1,"2026-11-01")),10000);assert.equal(monthSettings(value,"2026-10").budget,0);});
 test("주 경계 이동이 월초 하루짜리 주를 건너뛰지 않는다",()=>{const october=getPeriod("weekly",1,"2026-10-31");const first=getPeriod("weekly",1,offsetDate(october.end,1));assert.equal(first.start,"2026-11-01");assert.equal(first.end,"2026-11-01");assert.equal(getPeriod("weekly",1,offsetDate(first.end,1)).start,"2026-11-02");});
@@ -43,4 +43,147 @@ test("하루 사용 가능액은 선택일까지의 지출과 이번 주 남은 
   assert.deepEqual(dailySpendingAllowance(value, "2026-11-03"), {
     available: 6000, remaining: 60000, reserved: 24000, days: 6,
   });
+});
+
+
+test("약속은 여러 지출과 연결해도 유지되고 실제 합계만 소비에 한 번 반영한다", () => {
+  const value = data();
+  value.finance!.plans = [{ id: "plan", date: "2026-11-03", amount: 50000, memo: "데이트" }];
+  value.expenses = [
+    { id: "dinner", date: "2026-11-03", amount: 24000, category: "식비", memo: "저녁" },
+    { id: "cafe", date: "2026-11-03", amount: 9000, category: "카페", memo: "커피" },
+  ];
+  const week = getPeriod("weekly", 1, "2026-11-03");
+  assert.equal(financeSummary(value, week).reserved, 50000);
+  value.finance = linkPlanExpenses(value, "plan", ["dinner", "cafe"]);
+  const result = planSummary(value, value.finance.plans[0]);
+  assert.equal(value.finance.plans.length, 1);
+  assert.equal(value.expenses.length, 2);
+  assert.equal(result.completed, true);
+  assert.equal(result.actual, 33000);
+  assert.equal(financeSummary(value, week).spent, 33000);
+  assert.equal(financeSummary(value, week).reserved, 0);
+  assert.equal(dailySpendingAllowance(value, "2026-11-03").reserved, 0);
+  assert.equal(cashFlow(value, "2026-11").planned, 0);
+  const restored = JSON.parse(JSON.stringify(value));
+  assert.ok(isFinance(restored.finance));
+  assert.equal(planSummary(restored, restored.finance.plans[0]).actual, 33000);
+});
+
+test("연결된 지출 수정·삭제·복원은 약속 실제 합계와 완료 상태에 반영된다", () => {
+  const value = data();
+  value.finance!.plans = [{ id: "plan", date: "2026-11-03", amount: 50000, memo: "" }];
+  const expense = { id: "expense", date: "2026-11-03", amount: 20000, category: "식비", memo: "" };
+  value.expenses = [expense];
+  value.finance = linkPlanExpenses(value, "plan", [expense.id]);
+  value.expenses = [{ ...expense, amount: 25000 }];
+  assert.equal(planSummary(value, value.finance.plans[0]).actual, 25000);
+  value.expenses = [];
+  assert.equal(planSummary(value, value.finance.plans[0]).completed, false);
+  assert.equal(financeSummary(value, getPeriod("weekly", 1, "2026-11-03")).reserved, 50000);
+  assert.ok(isFinance(value.finance));
+  value.expenses = [expense];
+  assert.equal(planSummary(value, value.finance.plans[0]).completed, true);
+  value.finance = linkPlanExpenses(value, "plan", []);
+  assert.equal(planSummary(value, value.finance.plans[0]).completed, false);
+  assert.equal(value.expenses.length, 1);
+});
+
+test("없는 지출·중복 지출·다른 약속의 지출은 연결할 수 없다", () => {
+  const value = data();
+  value.finance!.plans = [
+    { id: "one", date: "2026-11-03", amount: 50000, memo: "" },
+    { id: "two", date: "2026-11-03", amount: 50000, memo: "" },
+  ];
+  value.expenses = [{ id: "expense", date: "2026-11-03", amount: 20000, category: "식비", memo: "" }];
+  assert.throws(() => linkPlanExpenses(value, "one", ["missing"]));
+  assert.throws(() => linkPlanExpenses(value, "missing", ["expense"]));
+  assert.throws(() => linkPlanExpenses(value, "one", ["expense", "expense"]));
+  value.finance = linkPlanExpenses(value, "one", ["expense"]);
+  assert.throws(() => linkPlanExpenses(value, "two", ["expense"]));
+  value.finance.plans[1].expenseIds = ["expense"];
+  assert.equal(isFinance(value.finance), false);
+  value.finance.plans[1].expenseIds = [];
+  value.finance.plans[0].expenseIds = ["expense", "expense"];
+  assert.equal(isFinance(value.finance), false);
+});
+
+test("기존 약속과 나중 날짜의 지출은 과거 일 예산에서 잘못 완료 처리하지 않는다", () => {
+  const value = data();
+  value.finance!.plans = [{ id: "plan", date: "2026-11-05", amount: 50000, memo: "" }];
+  assert.ok(isFinance(value.finance));
+  value.expenses = [{ id: "expense", date: "2026-11-05", amount: 20000, category: "식비", memo: "" }];
+  value.finance = linkPlanExpenses(value, "plan", ["expense"]);
+  assert.equal(dailySpendingAllowance(value, "2026-11-03").reserved, 50000);
+  assert.equal(dailySpendingAllowance(value, "2026-11-05").reserved, 0);
+});
+
+
+test("정산 후 부족액은 미수금을 한 번만 더하고 이미 받은 정산은 중복 가산하지 않는다", () => {
+  const value = data();
+  value.finance!.openingDate = "2026-11-01";
+  value.finance!.openingBalance = 0;
+  value.expenses = [{ id: "dinner", date: "2026-11-03", amount: 20000, category: "식비", memo: "" }];
+  value.finance!.payments.dinner = { gross: 80000, split: 4, method: "cash", settled: false, settledDate: "2026-11-03" };
+  let flow = cashFlow(value, "2026-11");
+  assert.equal(flow.balance, -80000);
+  assert.equal(flow.receivable, 60000);
+  assert.equal(flow.balanceAfterReceivables, -20000);
+  assert.equal(flow.shortfallAfterReceivables, 20000);
+  value.finance!.payments.dinner.settlements = [{ count: 1, date: "2026-11-06" }, { count: 1, date: "2026-12-01" }];
+  flow = cashFlow(value, "2026-11");
+  assert.equal(flow.balance, -60000);
+  assert.equal(flow.receivable, 40000);
+  assert.equal(flow.shortfallAfterReceivables, 20000);
+  value.finance!.incomes = [{ id: "income", date: "2026-11-01", amount: 30000, memo: "" }];
+  flow = cashFlow(value, "2026-11");
+  assert.equal(flow.balanceAfterReceivables, 10000);
+  assert.equal(flow.shortfallAfterReceivables, 0);
+});
+
+
+test("11월 1일 시작 잔액으로 10월 말 잔액을 표시하며 11월 수입을 섞지 않는다", () => {
+  const value = data();
+  value.finance!.openingDate = "2026-11-01";
+  value.finance!.openingBalance = 100000;
+  value.finance!.incomes = [{ id: "income", date: "2026-11-01", amount: 50000, memo: "" }];
+  assert.equal(cashFlow(value, "2026-10").balance, 100000);
+  assert.equal(cashFlow(value, "2026-11").balance, 150000);
+});
+
+test("기준일 이전 월말 잔액은 수입·정산·카드·할부·고정비·저축을 역산한다", () => {
+  const value = data();
+  const finance = value.finance!;
+  finance.openingDate = "2026-11-15";
+  finance.openingBalance = 100000;
+  finance.billingDay = 15;
+  finance.closingDay = 31;
+  finance.billingOffset = 1;
+  finance.incomes = [
+    { id: "oct-income", date: "2026-10-01", amount: 50000, memo: "" },
+    { id: "nov-income", date: "2026-11-01", amount: 10000, memo: "" },
+    { id: "future-income", date: "2026-11-20", amount: 99999, memo: "" },
+  ];
+  value.expenses = [
+    { id: "cash", date: "2026-10-05", amount: 20000, category: "식비", memo: "" },
+    { id: "card", date: "2026-09-10", amount: 30000, category: "식비", memo: "" },
+  ];
+  finance.payments.cash = { gross: 40000, split: 2, method: "cash", settled: true, settledDate: "2026-10-10" };
+  finance.payments.card = { gross: 30000, split: 1, method: "card", settled: false, settledDate: "2026-09-10" };
+  finance.fixedExpenses = [
+    { id: "fixed-cash", date: "2026-10-03", endMonth: "2026-10", amount: 5000, memo: "", method: "cash" },
+    { id: "fixed-card", date: "2026-09-05", endMonth: "2026-09", amount: 4000, memo: "", method: "card" },
+  ];
+  finance.installments = [{ id: "installment", date: "2026-10-15", amount: 20000, months: 2, memo: "" }];
+  finance.savings = [
+    { id: "deposit", date: "2026-10-07", amount: 7000, memo: "", direction: "deposit" },
+    { id: "withdraw", date: "2026-10-08", amount: 2000, memo: "", direction: "withdraw" },
+  ];
+  assert.equal(cashFlow(value, "2026-09").balance, 114000);
+  assert.equal(cashFlow(value, "2026-10").balance, 90000);
+  // Moving the opening anchor to that reconstructed balance preserves the result.
+  const earlier = structuredClone(value);
+  earlier.finance!.openingDate = "2026-10-01";
+  earlier.finance!.openingBalance = 114000;
+  assert.equal(cashFlow(earlier, "2026-10").balance, 90000);
 });

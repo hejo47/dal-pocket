@@ -4,13 +4,13 @@ import { createContext, useCallback, useContext, useRef, useState, useSyncExtern
 import type { ReactNode } from "react";
 
 import { CATEGORIES, getPeriod, getPeriodExpenses, todayInSeoul } from "@/lib/pocket";
-import { financeOf, financeSummary } from "@/lib/finance";
-import type { Finance, MoneyEntry, Payment } from "@/lib/finance";
+import { financeOf, financeSummary, linkPlanExpenses } from "@/lib/finance";
+import type { Finance, Payment } from "@/lib/finance";
 import type { BudgetMode, Category, Expense, FontPreferences, PocketData } from "@/lib/pocket";
 import { getServerSnapshot, getSnapshot, loadServerCopy, retryCloud, subscribe, updatePocket as updateStoredPocket } from "@/lib/pocket-storage";
 
 export type ExpenseDraft = { amount: string; category: Category; date: string; memo: string; payment?: Payment; splitInput?: string };
-type EditorState = { planId?: string; open: boolean; expenseId: string | null; draft: ExpenseDraft };
+type EditorState = { open: boolean; expenseId: string | null; draft: ExpenseDraft };
 type Notice = { message: string; action?: { label: string; onClick: () => void } } | null;
 const emptyDraft = (today: string, category: string = CATEGORIES[0]): ExpenseDraft => ({ amount: "", category, date: today, memo: "", payment: { gross: 0, split: 1, method: "card", settled: false, settledDate: today } });
 
@@ -85,14 +85,15 @@ function usePocketController(snapshot: ReturnType<typeof getSnapshot>) {
       return { open: true, expenseId, draft };
     });
   }
-  function openPlanExpense(plan: MoneyEntry) {
-    returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setEditor({
-      open: true,
-      expenseId: null,
-      planId: plan.id,
-      draft: { ...emptyDraft(plan.date, data.categories[0] ?? CATEGORIES[0]), memo: plan.memo },
-    });
+  function savePlanLinks(planId: string, expenseIds: string[]) {
+    try {
+      const persisted = updatePocket((current) => ({ ...current, finance: linkPlanExpenses(current, planId, expenseIds) }));
+      notify(expenseIds.length ? "약속에 지출 내역을 연결했습니다." : "약속의 지출 연결을 해제했습니다.", persisted);
+      return true;
+    } catch {
+      notify("연결할 내역이 바뀌었습니다. 다시 선택해주세요.");
+      return false;
+    }
   }
   function closeEditor() { setEditor((current) => ({ ...current, open: false })); }
   function restoreEditorFocus() {
@@ -104,11 +105,10 @@ function usePocketController(snapshot: ReturnType<typeof getSnapshot>) {
     setEditor((current) => ({ ...current, draft: { ...current.draft, ...patch } }));
   }
   function saveExpense(amount: number) {
-    const { expenseId, draft, planId } = editor;
+    const { expenseId, draft } = editor;
     const expense: Expense = { id: expenseId ?? crypto.randomUUID(), amount: Math.ceil(amount / (draft.payment?.split ?? 1)), category: draft.category, date: draft.date, memo: draft.memo.trim() };
     const persisted = updatePocket((current) => {
       const finance = financeOf(current);
-      if (planId) finance.plans = finance.plans.filter((plan) => plan.id !== planId);
       finance.payments = { ...finance.payments, [expense.id]: { gross: amount, split: 1, method: "card", settled: false, settledDate: today, ...draft.payment } };
       finance.payments[expense.id].gross = amount;
       if (expenseId) return { ...current, finance, expenses: current.expenses.map((item) => item.id === expenseId ? expense : item) };
@@ -138,7 +138,7 @@ function usePocketController(snapshot: ReturnType<typeof getSnapshot>) {
   }
 
   return { data, today, ready, storage, retryCloud, loadServerCopy, period, expenses, summary, category, setCategory, dailyView, setMode,
-    saveBudget, saveMonthlyBudget, saveFinance, addCategory, deleteCategory, notice, dismissNotice, editor, openEditor, openPlanExpense, closeEditor,
+    saveBudget, saveMonthlyBudget, saveFinance, addCategory, deleteCategory, notice, dismissNotice, editor, openEditor, savePlanLinks, closeEditor,
     updateDraft, saveExpense, deleteExpense, restoreEditorFocus, startOwnRecords, saveFonts };
 }
 

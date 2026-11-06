@@ -2,6 +2,7 @@ import { getPeriod, isDateKey, offsetDate, sumExpenses } from "./pocket.ts";
 import type { PocketData, Period } from "./pocket.ts";
 
 export type MoneyEntry = { id: string; date: string; amount: number; memo: string };
+export type PlanEntry = MoneyEntry & { expenseIds?: string[] };
 export type SavingsEntry = MoneyEntry & { direction: "deposit" | "withdraw" };
 export type Installment = MoneyEntry & { months: number };
 export type FixedExpense = MoneyEntry & { endMonth?: string; includeInBudget?: boolean; method?: "cash" | "card"; cadence?: "monthly" | "sessions"; sessionsPerPayment?: number; sessionDates?: string[]; paymentDates?: string[] };
@@ -10,7 +11,7 @@ export type Payment = { gross: number; split: number; method: "cash" | "card"; s
 export type Finance = {
   months: Record<string, { budget: number; groceries: number }>;
   openingBalance: number; openingDate: string; billingDay: number; closingDay?: number; billingOffset?: number;
-  incomes: MoneyEntry[]; plans: MoneyEntry[]; installments: Installment[];
+  incomes: MoneyEntry[]; plans: PlanEntry[]; installments: Installment[];
   payments: Record<string, Payment>;
   fixedExpenses?: FixedExpense[];
   savings?: SavingsEntry[];
@@ -25,13 +26,31 @@ export function isFinance(value: unknown): value is Finance {
   return (data.closingDay === undefined || Number.isInteger(data.closingDay) && data.closingDay >= 1 && data.closingDay <= 31) && (data.billingOffset === undefined || Number.isInteger(data.billingOffset) && data.billingOffset >= 0 && data.billingOffset <= 2) && Number.isSafeInteger(data.openingBalance) && Math.abs(data.openingBalance) <= 1_000_000_000 && isDateKey(data.openingDate) && Number.isInteger(data.billingDay) && data.billingDay >= 1 && data.billingDay <= 31
     && !!data.months && typeof data.months === "object" && Object.entries(data.months).every(([month, setting]) => /^\d{4}-\d{2}$/.test(month) && isDateKey(`${month}-01`) && setting && amount(setting.budget) && amount(setting.groceries))
     && Array.isArray(data.incomes) && data.incomes.length <= 10000 && data.incomes.every(entry)
-    && Array.isArray(data.plans) && data.plans.length <= 10000 && data.plans.every(entry)
+    && Array.isArray(data.plans) && data.plans.length <= 10000 && data.plans.every((plan) => entry(plan) && (plan.expenseIds === undefined || Array.isArray(plan.expenseIds) && plan.expenseIds.length <= 10000 && plan.expenseIds.every((id) => typeof id === "string" && id.length > 0 && id.length <= 100) && new Set(plan.expenseIds).size === plan.expenseIds.length))
+    && new Set(data.plans.flatMap((plan) => plan.expenseIds ?? [])).size === data.plans.reduce((sum, plan) => sum + (plan.expenseIds?.length ?? 0), 0)
     && (data.savings === undefined || Array.isArray(data.savings) && data.savings.length <= 10000 && data.savings.every((item) => entry(item) && ["deposit", "withdraw"].includes(item.direction)))
     && (data.noSpendDates === undefined || Array.isArray(data.noSpendDates) && data.noSpendDates.length <= 10000 && data.noSpendDates.every(isDateKey))
     && Array.isArray(data.installments) && data.installments.length <= 1000 && data.installments.every((item) => entry(item) && Number.isInteger(item.months) && item.months >= 2 && item.months <= 60)
     && (data.fixedExpenses === undefined || Array.isArray(data.fixedExpenses) && data.fixedExpenses.length <= 1000 && data.fixedExpenses.every((item) => entry(item) && (item.method === undefined || ["cash", "card"].includes(item.method)) && (item.cadence === undefined || ["monthly", "sessions"].includes(item.cadence)) && (item.cadence !== "sessions" || Number.isInteger(item.sessionsPerPayment) && item.sessionsPerPayment! >= 1 && item.sessionsPerPayment! <= 100 && Array.isArray(item.sessionDates) && item.sessionDates.length <= 10000 && item.sessionDates.every((date) => isDateKey(date) && date >= item.date) && Array.isArray(item.paymentDates) && item.paymentDates.length >= 1 && item.paymentDates.length <= 10000 && item.paymentDates.every((date) => isDateKey(date) && date >= item.date)) && (item.includeInBudget === undefined || typeof item.includeInBudget === "boolean") && (!item.endMonth || isDateKey(item.endMonth + "-01") && item.endMonth >= item.date.slice(0, 7))))
     && !!data.payments && typeof data.payments === "object" && Object.values(data.payments).every((item) => item && amount(item.gross) && Number.isInteger(item.split) && item.split >= 1 && item.split <= 100 && ["cash", "card"].includes(item.method) && (item.groceries === undefined || typeof item.groceries === "boolean") && (item.settlements === undefined || Array.isArray(item.settlements) && item.settlements.length <= 100 && item.settlements.every((receipt) => receipt && Number.isInteger(receipt.count) && receipt.count > 0 && isDateKey(receipt.date)) && item.settlements.reduce((sum,receipt) => sum + receipt.count, 0) <= item.split - 1) && typeof item.settled === "boolean" && isDateKey(item.settledDate) && (item.note === undefined || typeof item.note === "string" && item.note.length <= 200));
 }
+// Resolve actual records, so editing/deleting a linked expense updates the result too.
+export function planSummary(data: PocketData, plan: PlanEntry, through?: string) {
+  const ids = new Set(plan.expenseIds ?? []);
+  const expenses = data.expenses.filter((expense) => ids.has(expense.id) && (!through || expense.date <= through));
+  return { expenses, actual: sumExpenses(expenses), completed: expenses.length > 0 };
+}
+
+export function linkPlanExpenses(data: PocketData, planId: string, expenseIds: string[]): Finance {
+  const finance = financeOf(data);
+  const validIds = new Set(data.expenses.map((expense) => expense.id));
+  const occupied = new Set(finance.plans.filter((plan) => plan.id !== planId).flatMap((plan) => plan.expenseIds ?? []));
+  if (!finance.plans.some((plan) => plan.id === planId) || new Set(expenseIds).size !== expenseIds.length || expenseIds.some((id) => !validIds.has(id) || occupied.has(id))) {
+    throw new Error("INVALID_PLAN_EXPENSE_LINKS");
+  }
+  return { ...finance, plans: finance.plans.map((plan) => plan.id === planId ? { ...plan, expenseIds: [...expenseIds] } : plan) };
+}
+
 export function settlementRecords(payment: Payment): Settlement[] {
   return payment.settlements ?? (payment.settled && payment.split > 1 ? [{ count: payment.split - 1, date: payment.settledDate }] : []);
 }
@@ -125,7 +144,7 @@ export function financeSummary(data: PocketData, period: Period) {
   const fixedSpent = fixedTotal(data, period.start, period.end);
   const spent = regularSpent + fixedTotal(data, period.start, period.end, true);
   const remaining = budget - spent;
-  const reserved = financeOf(data).plans.filter((plan) => plan.date >= period.start && plan.date <= period.end).reduce((sum, plan) => sum + plan.amount, 0);
+  const reserved = financeOf(data).plans.filter((plan) => plan.date >= period.start && plan.date <= period.end && !planSummary(data, plan, period.end).completed).reduce((sum, plan) => sum + plan.amount, 0);
   return { carriedIn, regularSpent, fixedSpent, budget, spent, remaining, carried, reserved, usedPercent: budget ? Math.round(spent / budget * 100) : spent ? 100 : 0, dailyAvailable: Math.max(0, Math.floor((remaining - reserved) / period.remainingDays)), dailyAverage: Math.floor(spent / period.elapsedDays) };
 }
 export function dailySpendingAllowance(data: PocketData, date: string) {
@@ -134,7 +153,7 @@ export function dailySpendingAllowance(data: PocketData, date: string) {
   const spent = sumExpenses(data.expenses.filter((expense) => expense.date >= week.start && expense.date <= date));
   const fixed = fixedTotal(data, week.start, date, true);
   const reserved = financeOf(data).plans
-    .filter((plan) => plan.date >= date && plan.date <= week.end)
+    .filter((plan) => plan.date >= date && plan.date <= week.end && !planSummary(data, plan, date).completed)
     .reduce((sum, plan) => sum + plan.amount, 0);
   const remaining = budget - spent - fixed;
   const available = Math.max(0, Math.floor((remaining - reserved) / week.remainingDays));
@@ -166,7 +185,12 @@ export function fixedCharges(item: FixedExpense, start: string, end: string) {
 export function cashFlow(data: PocketData, month: string) {
   const finance = financeOf(data);
   const end = getPeriod("monthly", 1, `${month}-01`).end;
-  const inRange = (date: string) => date >= finance.openingDate && date <= end;
+  const backwards = end < finance.openingDate;
+  // openingBalance is the balance at the START of openingDate.
+  // Reverse only movements after the selected month-end and before that day.
+  const rangeStart = backwards ? offsetDate(end, 1) : finance.openingDate;
+  const rangeEnd = backwards ? offsetDate(finance.openingDate, -1) : end;
+  const inRange = (date: string) => date >= rangeStart && date <= rangeEnd;
   let cashOut = 0, cardOut = 0, received = 0, receivable = 0, installments = 0, dueThisMonth = 0, futureCard = 0, installmentOutstanding = 0;
   let cardSettlements = 0;
   for (const expense of data.expenses) {
@@ -175,7 +199,7 @@ export function cashFlow(data: PocketData, month: string) {
     const dueDate = cardPaymentDate(finance, expense.date);
     if (payment?.method === "card") { if (expense.date <= end && dueDate > end) futureCard += gross; if (inRange(dueDate)) cardOut += gross; if (dueDate.slice(0, 7) === month) dueThisMonth += gross; }
     else if (inRange(expense.date)) cashOut += gross;
-    if (payment && expense.date <= end) {
+    if (payment) {
       const total = Math.max(0, gross - expense.amount);
       const people = payment.split - 1;
       let count = 0, paidAsOfEnd = 0;
@@ -185,8 +209,8 @@ export function cashFlow(data: PocketData, month: string) {
         if (receipt.date <= end) paidAsOfEnd += portion;
         if (inRange(receipt.date)) received += portion;
       }
-      receivable += total - paidAsOfEnd;
-      if (payment.method === "card" && dueDate.slice(0, 7) === month) {
+      if (expense.date <= end) receivable += total - paidAsOfEnd;
+      if (expense.date <= end && payment.method === "card" && dueDate.slice(0, 7) === month) {
         cardSettlements += settlementSummary(payment, expense.amount).receivedAmount;
       }
     }
@@ -195,11 +219,11 @@ export function cashFlow(data: PocketData, month: string) {
   let fixedCardOut = 0;
   for (const item of finance.fixedExpenses ?? []) {
     if (item.method !== "card") continue;
-    for (const chargeDate of fixedCharges(item, nextMonth(finance.openingDate.slice(0, 7), -3) + "-01", end)) {
+    for (const chargeDate of fixedCharges(item, nextMonth(backwards ? month : finance.openingDate.slice(0, 7), -3) + "-01", rangeEnd > end ? rangeEnd : end)) {
       const dueDate = cardPaymentDate(finance, chargeDate);
       if (inRange(dueDate)) { cardOut += item.amount; fixedCardOut += item.amount; }
       if (dueDate.slice(0, 7) === month) dueThisMonth += item.amount;
-      if (dueDate > end) futureCard += item.amount;
+      if (chargeDate <= end && dueDate > end) futureCard += item.amount;
     }
   }
   for (const item of finance.installments) {
@@ -212,10 +236,10 @@ export function cashFlow(data: PocketData, month: string) {
   }
   const income = finance.incomes.filter((entry) => inRange(entry.date)).reduce((sum, entry) => sum + entry.amount, 0);
   const installmentMonth = finance.installments.reduce((sum, item) => sum + installmentDue(item, month), 0);
-  const planned = finance.plans.filter((entry) => entry.date.slice(0, 7) === month).reduce((sum, entry) => sum + entry.amount, 0);
+  const planned = finance.plans.filter((entry) => entry.date.slice(0, 7) === month && !planSummary(data, entry, end).completed).reduce((sum, entry) => sum + entry.amount, 0);
   const monthSpent = sumExpenses(data.expenses.filter((expense) => expense.date.slice(0,7) === month));
   const fixedMonth = fixedTotal(data, month + "-01", end);
-  const fixedCashOut = fixedTotal(data, finance.openingDate, end, false, "cash");
+  const fixedCashOut = fixedTotal(data, rangeStart, rangeEnd, false, "cash");
   const fixedOut = fixedCashOut + fixedCardOut;
   const livingRemaining = monthSettings(data, month).budget - monthSpent - planned - fixedTotal(data, month + "-01", end, true);
   const savings = finance.savings ?? [];
@@ -223,7 +247,10 @@ export function cashFlow(data: PocketData, month: string) {
   const withdrawnMonth = savings.filter((item) => item.date.slice(0,7) === month && item.direction === "withdraw").reduce((sum,item) => sum + item.amount, 0);
   const savingsBalance = savings.filter((item) => item.date <= end).reduce((sum,item) => sum + (item.direction === "deposit" ? item.amount : -item.amount), 0);
   const savingsTransfer = savings.filter((item) => inRange(item.date)).reduce((sum,item) => sum + (item.direction === "deposit" ? item.amount : -item.amount), 0);
-  const balance = finance.openingBalance + income + received - cashOut - cardOut - installments - fixedCashOut - savingsTransfer;
+  const netMovement = income + received - cashOut - cardOut - installments - fixedCashOut - savingsTransfer;
+  const balance = finance.openingBalance + (backwards ? -netMovement : netMovement);
+  const balanceAfterReceivables = balance + receivable;
+  const shortfallAfterReceivables = Math.max(0, -balanceAfterReceivables);
   const availableBalance = balance - futureCard - installmentOutstanding - planned;
-  return { savedMonth, withdrawnMonth, savingsBalance, savingsTransfer, fixedCashOut, fixedCardOut, fixedMonth, fixedOut, monthSpent, availableBalance, installmentOutstanding, futureCard, balance, income, cashOut, cardOut, received, receivable, installmentMonth, cardBill, cardSettlements, dueThisMonth, planned, recommendedLimit: Math.max(0, Math.min(livingRemaining, availableBalance)) };
+  return { savedMonth, withdrawnMonth, savingsBalance, savingsTransfer, fixedCashOut, fixedCardOut, fixedMonth, fixedOut, monthSpent, availableBalance, installmentOutstanding, futureCard, balance, balanceAfterReceivables, shortfallAfterReceivables, income, cashOut, cardOut, received, receivable, installmentMonth, cardBill, cardSettlements, dueThisMonth, planned, recommendedLimit: Math.max(0, Math.min(livingRemaining, availableBalance)) };
 }

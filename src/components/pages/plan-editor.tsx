@@ -6,11 +6,11 @@ import { usePocket } from "@/components/providers/pocket-provider";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DateField, FieldLabel, TextField } from "@/components/ui/form-field";
 import { PillButton } from "@/components/ui/pill-button";
-import type { MoneyEntry } from "@/lib/finance";
+import type { PlanEntry } from "@/lib/finance";
 import { financeOf } from "@/lib/finance";
 import { isDateKey, parseAmount, validAmount } from "@/lib/pocket";
 
-export function PlanEditor({ date, open, onOpenChange, plan }: { date: string; open: boolean; onOpenChange: (open: boolean) => void; plan?: MoneyEntry }) {
+export function PlanEditor({ date, open, onOpenChange, plan }: { date: string; open: boolean; onOpenChange: (open: boolean) => void; plan?: PlanEntry }) {
   const pocket = usePocket();
   const [planDate, setPlanDate] = useState(date);
   const [error, setError] = useState("");
