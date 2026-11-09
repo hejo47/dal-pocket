@@ -112,19 +112,23 @@ export function foodBudgetSummary(data: PocketData, period: Period) {
   const food = data.expenses.filter((expense) => expense.category === "식비" || finance.payments[expense.id]?.groceries);
   const allocation = (start: string, end: string) => Math.floor(rate * Number(end.slice(8)) / 7) - Math.floor(rate * (Number(start.slice(8)) - 1) / 7);
   const base = allocation(period.start, period.end);
-  const previousSpent = sumExpenses(food.filter((expense) => expense.date >= month + "-01" && expense.date < period.start));
-  const previousAllocation = Math.floor(rate * (Number(period.start.slice(8)) - 1) / 7);
-  const carried = Math.max(0, previousSpent - previousAllocation);
-  const carriedIn = Math.max(0, previousAllocation - previousSpent);
-  const budget = Math.max(0, base + carriedIn - carried);
+  const total = financeSummary(data, period);
+  const baseTotal = allocatedBudget(data, period);
+  // Deduct overspending from the shared pool once, then distribute that pool.
+  // Food must never carry a second, independent debt on top of the total debt.
+  const shareOf = (pool: number, totalBase: number, foodBase: number) => totalBase > 0 ? Math.floor(pool * Math.min(foodBase, totalBase) / totalBase) : 0;
+  const budget = shareOf(total.budget, baseTotal, base);
+  const carried = Math.max(0, base - budget);
+  const carriedIn = Math.max(0, budget - base);
   const spent = sumExpenses(food.filter((expense) => expense.date >= period.start && expense.date <= period.end));
   const borrowed = Math.max(0, spent - budget);
+  const remaining = Math.max(0, Math.min(budget - spent, total.remaining));
   const nextDate = offsetDate(period.end, 1);
   const nextPeriod = nextDate.slice(0, 7) === month && period.mode === "weekly" ? getPeriod("weekly", data.weekStartsOn, nextDate) : null;
   const nextBase = nextPeriod ? allocation(nextPeriod.start, nextPeriod.end) : null;
-  const nextAdjustment = previousAllocation + base - previousSpent - spent;
-  const nextBudget = nextBase !== null ? Math.max(0, nextBase + nextAdjustment) : null;
-  return { configured: rate > 0, base, carriedIn, nextBase, nextAdjustment, budget, spent, carried, borrowed, remaining: Math.max(0, budget - spent), nextBudget, nextPeriod };
+  const nextBudget = nextPeriod ? shareOf(financeSummary(data, nextPeriod).budget, allocatedBudget(data, nextPeriod), nextBase!) : null;
+  const nextAdjustment = nextBudget !== null ? nextBudget - nextBase! : 0;
+  return { configured: rate > 0, base, carriedIn, nextBase, nextAdjustment, budget, spent, carried, borrowed, remaining, nextBudget, nextPeriod, generalBudget: total.budget - budget, generalRemaining: Math.max(0, total.remaining - remaining) };
 }
 export function financeSummary(data: PocketData, period: Period) {
   const month = period.start.slice(0, 7);
@@ -158,6 +162,21 @@ export function dailySpendingAllowance(data: PocketData, date: string) {
   const remaining = budget - spent - fixed;
   const available = Math.max(0, Math.floor((remaining - reserved) / week.remainingDays));
   return { available, remaining, reserved, days: week.remainingDays };
+}
+
+export function dailyBudgetStatus(data: PocketData, date: string) {
+  const week = getPeriod("weekly", data.weekStartsOn, date);
+  const { budget } = financeSummary(data, week);
+  const spentBefore = sumExpenses(data.expenses.filter((expense) => expense.date >= week.start && expense.date < date))
+    + fixedTotal(data, week.start, offsetDate(date, -1), true);
+  // Establish the allowance before this day's expenses complete their plans.
+  const beforeToday = { ...data, expenses: data.expenses.filter((expense) => expense.date < date) };
+  const pending = financeOf(data).plans.filter((plan) => plan.date >= date && plan.date <= week.end && !planSummary(beforeToday, plan).completed);
+  const reserved = pending.reduce((sum, plan) => sum + plan.amount, 0);
+  const todayPlans = pending.filter((plan) => plan.date === date).reduce((sum, plan) => sum + plan.amount, 0);
+  const allowance = Math.min(Math.max(0, budget - spentBefore), Math.max(0, Math.floor((budget - spentBefore - reserved) / week.remainingDays)) + todayPlans);
+  const spent = sumExpenses(data.expenses.filter((expense) => expense.date === date)) + fixedTotal(data, date, date, true);
+  return { allowance, spent, overSpent: Math.max(0, spent - allowance) };
 }
 
 export function nextMonth(month: string, offset = 1) { return new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)) - 1 + offset, 1)).toISOString().slice(0, 7); }

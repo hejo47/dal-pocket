@@ -1,5 +1,7 @@
 "use client";
 
+import { PlanEditor } from "@/components/pages/plan-editor";
+import { RecordAddMenu } from "@/components/ui/record-add-menu";
 import { IconLink } from "@/components/ui/icon-link";
 
 import Link from "next/link";
@@ -58,6 +60,7 @@ function ExpenseModeButtons() {
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const pocket = usePocket();
+  const [planOpen, setPlanOpen] = useState(false);
   const [signedIn, setSignedIn] = useState<boolean | null>(hasSupabaseAuthConfig ? null : false);
   useEffect(() => {
     if (!hasSupabaseAuthConfig) return;
@@ -82,10 +85,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         : pathname === "/expenses" ? <ExpensesPreview checking={signedIn === null} />
         : <SignedOutPage key={pathname} pathname={pathname} checking={signedIn === null} />}
     </main>
-    {signedIn && showAdd && <div className="fixed inset-x-0 bottom-20 z-40 mx-auto flex w-full max-w-page justify-end px-6"><PillButton id="add-expense" aria-label="지출 추가" title="지출 추가" size="icon" className="rounded-full px-3 py-3 shadow-lg" onClick={() => pocket.openEditor()} disabled={!pocket.ready}><IconContainer size="slg"><Plus /></IconContainer></PillButton></div>}
+    {signedIn && showAdd && <div className="fixed inset-x-0 bottom-20 z-40 mx-auto flex w-full max-w-page justify-end px-6"><RecordAddMenu side="top" onExpense={() => pocket.openEditor()} onPlan={() => setPlanOpen(true)} trigger={<PillButton id="add-expense" aria-label="지출·약속 추가" title="지출·약속 추가" size="icon" className="rounded-full px-3 py-3 shadow-lg" disabled={!pocket.ready}><IconContainer size="slg"><Plus /></IconContainer></PillButton>} /></div>}
     <footer className="fixed inset-x-0 bottom-0 mx-auto flex w-full max-w-page flex-col gap-2 border-t border-black-010 bg-white px-6 pt-0 pb-0">
       <nav aria-label="주요 화면" className="flex w-full gap-2">{navigation.map(({ href, label, icon: Icon }) => <Link key={href} href={href} aria-current={(pathname === href || (pathname === "/finance" && href === "/analysis")) ? "page" : undefined} className={cn("flex flex-1 flex-col items-center justify-center gap-1 border-t-2 px-1 py-3 text-xs leading-150", (pathname === href || (pathname === "/finance" && href === "/analysis")) ? "border-black-100 text-black-100" : "border-transparent text-black-030")}><IconContainer size="slg"><Icon /></IconContainer>{label}</Link>)}</nav>
     </footer>
-    {signedIn && <><ExpenseEditor /><PocketToasts /></>}
+    {signedIn && <><ExpenseEditor />{planOpen && <PlanEditor date={pocket.today} open={planOpen} onOpenChange={setPlanOpen} />}<PocketToasts /></>}
   </div>;
 }

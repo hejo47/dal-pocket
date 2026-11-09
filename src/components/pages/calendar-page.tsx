@@ -1,7 +1,6 @@
 "use client";
 
-import { DropdownMenu } from "radix-ui";
-import { CalendarPlus, ReceiptText } from "lucide-react";
+import { RecordAddMenu } from "@/components/ui/record-add-menu";
 import { PlanRecord } from "@/components/pages/plan-record";
 import { PlanEditor } from "@/components/pages/plan-editor";
 import { RecordRemoveButton } from "@/components/ui/record-remove-button";
@@ -19,7 +18,7 @@ import { PillButton } from "@/components/ui/pill-button";
 import { PageSkeleton, ScreenTitle } from "@/components/ui/screen-title";
 
 import { formatMoney, getCalendarMonth, shortDate, sumExpenses, WEEKDAYS } from "@/lib/pocket";
-import { allocatedBudget, financeOf, financeSummary } from "@/lib/finance";
+import { allocatedBudget, financeOf, financeSummary, planSummary } from "@/lib/finance";
 import { cn } from "@/lib/utils";
 
 const compactMoney = new Intl.NumberFormat("ko-KR", { notation: "compact", maximumFractionDigits: 1 });
@@ -75,20 +74,15 @@ function CalendarView() {
           <PillButton type="button" variant="ghost" size="sm" aria-pressed={stamped} disabled={!stamped && (!canStamp || stamps.size >= 10000)} onClick={toggleStamp}>
             <IconContainer size="default"><BadgeCheck /></IconContainer>{stamped ? "무지출 완료" : "무지출 체크"}
           </PillButton>
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger asChild><PillButton variant="outline" size="sm"><IconContainer size="default"><Plus /></IconContainer>이 날짜에 추가</PillButton></DropdownMenu.Trigger>
-            <DropdownMenu.Portal>
-              <DropdownMenu.Content sideOffset={6} align="end" collisionPadding={15} className="z-50 flex min-w-40 flex-col gap-1 rounded-xl border border-black-010 bg-white p-1 shadow-md">
-                <DropdownMenu.Item disabled={selected > pocket.today} className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-3 text-sm outline-none data-[highlighted]:bg-black-005 data-[disabled]:opacity-40" onSelect={() => { setDayOpen(false); pocket.openEditor(undefined, selected); }}><IconContainer><ReceiptText /></IconContainer>지출 등록</DropdownMenu.Item>
-                <DropdownMenu.Item className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-3 text-sm outline-none data-[highlighted]:bg-black-005" onSelect={() => { setDayOpen(false); setPlanOpen(true); }}><IconContainer><CalendarPlus /></IconContainer>약속 등록</DropdownMenu.Item>
-              </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-          </DropdownMenu.Root>
+          <RecordAddMenu expenseDisabled={selected > pocket.today}
+            onExpense={() => { setDayOpen(false); pocket.openEditor(undefined, selected); }}
+            onPlan={() => { setDayOpen(false); setPlanOpen(true); }}
+            trigger={<PillButton variant="outline" size="sm"><IconContainer size="default"><Plus /></IconContainer>이 날짜에 추가</PillButton>} />
         </div>
         <div className="pocket-dialog-scroll flex flex-col gap-4">
           {finance.plans.some((plan) => plan.date === selected) && <section className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold">약속</h3>
-            {finance.plans.filter((plan) => plan.date === selected).map((plan) => <PlanRecord key={plan.id} plan={plan}
+            {finance.plans.filter((plan) => plan.date === selected).sort((a, b) => Number(planSummary(pocket.data, a).completed) - Number(planSummary(pocket.data, b).completed)).map((plan) => <PlanRecord key={plan.id} plan={plan}
               onExpenseSelect={(expense) => { setDayOpen(false); pocket.openEditor(expense); }}
               action={<RecordRemoveButton planned label={`${plan.memo || "약속"} 예정 해제`} onClick={() => pocket.saveFinance({ ...finance, plans: finance.plans.filter((entry) => entry.id !== plan.id) })} />} />)}
           </section>}

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createDemoData, getCalendarMonth, getPeriod, offsetDate } from "../src/lib/pocket.ts";
-import { allocatedBudget, cashFlow, dailySpendingAllowance, settlementSummary, unsettledExpenses, resizeSettlements, fixedDueDate, fixedTotal, foodBudgetSummary, emptyFinance, financeSummary, installmentDue, isFinance, monthSettings, planSummary, linkPlanExpenses } from "../src/lib/finance.ts";
+import { allocatedBudget, cashFlow, dailySpendingAllowance, settlementSummary, unsettledExpenses, resizeSettlements, fixedDueDate, fixedTotal, foodBudgetSummary, emptyFinance, financeSummary, installmentDue, isFinance, monthSettings, planSummary, linkPlanExpenses, dailyBudgetStatus } from "../src/lib/finance.ts";
 function data() { const value = createDemoData("2026-11-02"); value.expenses=[]; value.isDemo=false; value.finance={...emptyFinance(),months:{"2026-11":{budget:300000,groceries:30000}}}; return value; }
 test("월별 하나의 예산을 모든 짧은 주에 배분해도 합계가 동일하다",()=>{const value=data();const month=getCalendarMonth("2026-11",1,[]);assert.equal(month.weeks.reduce((sum,week)=>sum+allocatedBudget(value,week.period),0),300000);assert.equal(allocatedBudget(value,getPeriod("weekly",1,"2026-11-01")),10000);assert.equal(monthSettings(value,"2026-10").budget,0);});
 test("주 경계 이동이 월초 하루짜리 주를 건너뛰지 않는다",()=>{const october=getPeriod("weekly",1,"2026-10-31");const first=getPeriod("weekly",1,offsetDate(october.end,1));assert.equal(first.start,"2026-11-01");assert.equal(first.end,"2026-11-01");assert.equal(getPeriod("weekly",1,offsetDate(first.end,1)).start,"2026-11-02");});
@@ -15,7 +15,7 @@ test("사용자 카드 마감일 다음날 사용액은 다음 이용 기간으�
 test("고정 지출은 매월 반복하고 짧은 달은 말일에 적용한다",()=>{const item={id:"fixed",date:"2026-01-31",amount:50000,memo:"통신비",endMonth:"2026-03"};assert.equal(fixedDueDate(item,"2026-02"),"2026-02-28");assert.equal(fixedDueDate(item,"2026-04"),null);const value=data();value.finance!.fixedExpenses=[item];assert.equal(fixedTotal(value,"2026-01-01","2026-03-31"),150000);assert.equal(fixedTotal(value,"2026-02-01","2026-02-27"),0);});
 test("고정 지출은 별도 합계와 현금에만 반영하고 생활 예산에서 제외한다",()=>{const value=data();value.finance!.openingDate="2026-11-01";value.finance!.openingBalance=100000;value.finance!.fixedExpenses=[{id:"fixed",date:"2026-11-05",amount:30000,memo:"월세",includeInBudget:false}];const summary=financeSummary(value,getPeriod("monthly",1,"2026-11-02"));assert.equal(summary.regularSpent,0);assert.equal(summary.fixedSpent,30000);assert.equal(summary.spent,0);assert.equal(summary.remaining,300000);assert.equal(cashFlow(value,"2026-11").balance,70000);assert.ok(isFinance(value.finance));});
 
-test("초과 식비를 다음 주 식비에서 차감하고 월 마지막 주는 다음 주를 숨긴다",()=>{const value=data();value.finance!.months["2026-11"].groceries=70000;value.expenses=[{id:"f0",date:"2026-11-01",amount:10000,category:"식비",memo:""},{id:"f1",date:"2026-11-03",amount:90000,category:"식비",memo:""}];const current=foodBudgetSummary(value,getPeriod("weekly",1,"2026-11-03"));assert.equal(current.borrowed,20000);assert.equal(current.nextBudget,50000);assert.equal(foodBudgetSummary(value,getPeriod("weekly",1,"2026-11-09")).budget,50000);assert.equal(foodBudgetSummary(value,getPeriod("weekly",1,"2026-11-30")).nextPeriod,null);});
+test("전체 초과분을 식비 비율로 배분하고 월 마지막 주는 다음 주를 숨긴다",()=>{const value=data();value.finance!.months["2026-11"].groceries=70000;value.expenses=[{id:"f0",date:"2026-11-01",amount:10000,category:"식비",memo:""},{id:"f1",date:"2026-11-03",amount:90000,category:"식비",memo:""}];const current=foodBudgetSummary(value,getPeriod("weekly",1,"2026-11-03"));assert.equal(current.borrowed,20000);assert.equal(current.nextBudget,50000);assert.equal(foodBudgetSummary(value,getPeriod("weekly",1,"2026-11-09")).budget,50000);assert.equal(foodBudgetSummary(value,getPeriod("weekly",1,"2026-11-30")).nextPeriod,null);});
 
 test("주별 미사용액은 전체 예산과 식비에 가산하되 월 총액은 늘리지 않는다",()=>{const value=data();value.finance!.months["2026-11"].groceries=70000;const period=getPeriod("weekly",1,"2026-11-02");const summary=financeSummary(value,period);assert.equal(summary.carriedIn,10000);assert.equal(summary.budget,80000);const food=foodBudgetSummary(value,period);assert.equal(food.carriedIn,10000);assert.equal(food.nextBase,70000);assert.equal(food.nextBudget,150000);assert.equal(financeSummary(value,getPeriod("monthly",1,"2026-11-02")).budget,300000);assert.equal(foodBudgetSummary(value,getPeriod("weekly",1,"2026-11-30")).nextPeriod,null);});
 
@@ -186,4 +186,95 @@ test("기준일 이전 월말 잔액은 수입·정산·카드·할부·고정�
   earlier.finance!.openingDate = "2026-10-01";
   earlier.finance!.openingBalance = 114000;
   assert.equal(cashFlow(earlier, "2026-10").balance, 90000);
+});
+
+
+test("전체 초과분을 한 번 차감한 총예산을 생활비·식비로 비례 배분한다", () => {
+  const value = data();
+  value.finance!.months["2026-11"].groceries = 15000;
+  value.expenses = [
+    { id: "first", date: "2026-11-01", amount: 10000, category: "교통", memo: "" },
+    { id: "food", date: "2026-11-03", amount: 50000, category: "식비", memo: "" },
+    { id: "other", date: "2026-11-04", amount: 50000, category: "교통", memo: "" },
+  ];
+  const current = foodBudgetSummary(value, getPeriod("weekly", 1, "2026-11-03"));
+  const nextPeriod = getPeriod("weekly", 1, "2026-11-09");
+  const total = financeSummary(value, nextPeriod);
+  const food = foodBudgetSummary(value, nextPeriod);
+  assert.equal(total.budget, 40000);
+  assert.equal(food.base, 15000);
+  assert.equal(food.budget, 8571);
+  assert.equal(food.generalBudget, 31429);
+  assert.equal(food.budget + food.generalBudget, total.budget);
+  assert.equal(food.remaining, 8571);
+  assert.equal(current.nextBudget, food.budget);
+});
+
+test("일반 생활비만 초과해도 식비에 같은 총예산 조정 비율을 적용한다", () => {
+  const value = data();
+  value.finance!.months["2026-11"].groceries = 15000;
+  value.expenses = [
+    { id: "first", date: "2026-11-01", amount: 10000, category: "교통", memo: "" },
+    { id: "other", date: "2026-11-03", amount: 90000, category: "교통", memo: "" },
+  ];
+  const period = getPeriod("weekly", 1, "2026-11-09");
+  const food = foodBudgetSummary(value, period);
+  assert.equal(financeSummary(value, period).budget, 50000);
+  assert.equal(food.budget, 10714);
+  assert.equal(food.generalBudget, 39286);
+});
+
+test("식비 잔액은 공유 예산 잔액을 넘지 않고 배정 합계는 짧은 주에도 일치한다", () => {
+  const value = data();
+  value.finance!.months["2026-11"].groceries = 15000;
+  value.expenses = [{ id: "other", date: "2026-11-01", amount: 9000, category: "교통", memo: "" }];
+  const first = getPeriod("weekly", 1, "2026-11-01");
+  assert.equal(foodBudgetSummary(value, first).remaining, 1000);
+  for (const week of getCalendarMonth("2026-11", 1, value.expenses).weeks) {
+    const food = foodBudgetSummary(value, week.period);
+    const total = financeSummary(value, week.period);
+    assert.equal(food.budget + food.generalBudget, total.budget);
+    assert.ok(food.remaining <= Math.max(0, total.remaining));
+  }
+  value.finance!.months["2026-11"].budget = 0;
+  const food = foodBudgetSummary(value, first);
+  assert.equal(food.budget, 0);
+  assert.equal(food.remaining, 0);
+});
+
+
+test("일간 초과 안내는 지출 후 줄어든 사용 가능액 대신 지출 전 하루 기준액과 비교한다", () => {
+  const value = data();
+  value.expenses = [
+    { id: "first", date: "2026-11-01", amount: 10000, category: "식비", memo: "" },
+    { id: "today", date: "2026-11-02", amount: 15000, category: "식비", memo: "" },
+  ];
+  assert.deepEqual(dailyBudgetStatus(value, "2026-11-02"), { allowance: 10000, spent: 15000, overSpent: 5000 });
+  value.expenses[1].amount = 10000;
+  assert.equal(dailyBudgetStatus(value, "2026-11-02").overSpent, 0);
+});
+
+test("당일 약속 확보액은 하루 기준에 포함하며 내역 연결 여부로 초과액이 달라지지 않는다", () => {
+  const value = data();
+  value.expenses = [
+    { id: "first", date: "2026-11-01", amount: 10000, category: "식비", memo: "" },
+    { id: "today", date: "2026-11-02", amount: 43000, category: "식비", memo: "" },
+  ];
+  value.finance!.plans = [{ id: "plan", date: "2026-11-02", amount: 40000, memo: "" }];
+  const before = dailyBudgetStatus(value, "2026-11-02");
+  assert.deepEqual(before, { allowance: 44285, spent: 43000, overSpent: 0 });
+  value.finance = linkPlanExpenses(value, "plan", ["today"]);
+  assert.deepEqual(dailyBudgetStatus(value, "2026-11-02"), before);
+});
+
+
+test("당일 약속이 있어도 소진된 주 예산보다 큰 하루 기준액을 만들지 않는다", () => {
+  const value = data();
+  value.expenses = [
+    { id: "first", date: "2026-11-01", amount: 10000, category: "식비", memo: "" },
+    { id: "before", date: "2026-11-02", amount: 70000, category: "식비", memo: "" },
+    { id: "today", date: "2026-11-03", amount: 5000, category: "식비", memo: "" },
+  ];
+  value.finance!.plans = [{ id: "plan", date: "2026-11-03", amount: 40000, memo: "" }];
+  assert.deepEqual(dailyBudgetStatus(value, "2026-11-03"), { allowance: 0, spent: 5000, overSpent: 5000 });
 });

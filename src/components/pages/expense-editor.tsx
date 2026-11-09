@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 
+import { Switch } from "@/components/ui/switch";
 import { SettlementEditor } from "@/components/pages/settlement-editor";
 import { settlementRecords } from "@/lib/finance";
 import { usePocket } from "@/components/providers/pocket-provider";
@@ -44,7 +45,10 @@ export function ExpenseEditor() {
           <div className="flex flex-col gap-2"><FieldLabel htmlFor="expense-category" required>카테고리</FieldLabel><SelectField id="expense-category" value={editor.draft.category} options={pocket.data.categories.map((category) => ({ value: category, label: category }))} onChange={(event) => updateDraft({ category: event.target.value })} /></div>
           <div className="flex flex-col gap-2"><FieldLabel htmlFor="expense-date" required>날짜</FieldLabel><DateField id="expense-date" required max={pocket.today} value={editor.draft.date} onValueChange={(value) => { updateDraft({ date: value }); setError(""); }} /></div>
           <div className="flex flex-col gap-2"><FieldLabel htmlFor="expense-memo">소비 내용 <span className="text-xs">선택</span></FieldLabel><TextField id="expense-memo" maxLength={80} placeholder="예: 친구와 점심" value={editor.draft.memo} onChange={(event) => updateDraft({ memo: event.target.value })} /></div>
-          <label className="flex items-center gap-2 py-2 text-sm"><input type="checkbox" checked={payment.groceries ?? false} onChange={(event)=>updatePayment({groceries:event.target.checked})} />자취 식료품 구매</label>
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-black-010 p-3">
+            <div className="flex min-w-0 flex-col gap-1"><p id="expense-groceries-label" className="text-sm font-medium">자취 식료품 구매</p><p id="expense-groceries-hint" className="text-xs leading-150 text-black-030">켜면 이 지출을 식비 예산에도 합산해요.</p></div>
+            <div className="flex shrink-0 items-center gap-2"><span className="text-xs text-black-030">{payment.groceries ? "선택됨" : "선택 안 함"}</span><Switch aria-labelledby="expense-groceries-label" aria-describedby="expense-groceries-hint" checked={payment.groceries ?? false} onCheckedChange={(checked) => updatePayment({ groceries: checked })} /></div>
+          </div>
           <div className="flex flex-col gap-2"><FieldLabel htmlFor="expense-note">추가 메모</FieldLabel><TextField id="expense-note" maxLength={200} placeholder="약속, 정산 관련 내용 등" value={payment.note} onChange={(event)=>updatePayment({note:event.target.value})} /></div>
           {pocket.data.isDemo && !editing && <FieldHint>첫 지출을 저장하면 예시 내역 대신 내 기록을 시작합니다.</FieldHint>}
           <FieldError>{error}</FieldError>

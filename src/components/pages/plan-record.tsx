@@ -18,7 +18,7 @@ export function PlanRecord({ plan, action, onExpenseSelect }: { plan: PlanEntry;
   const summary = planSummary(pocket.data, plan);
   return <div className="flex min-w-0 flex-col gap-2 border-t border-black-010 py-3">
     <div className="flex items-center justify-between gap-2">
-      <div className="flex min-w-0 flex-col gap-1"><p className="text-xs text-black-030">{shortDate(plan.date)}</p><p className="flex items-center gap-1 text-sm font-semibold">{summary.completed && <IconContainer><BadgeCheck /></IconContainer>}<span className="min-w-0 break-words">{plan.memo || "약속"}</span>{summary.completed && <span className="shrink-0 text-xs font-medium text-black-030">기록 완료</span>}</p></div>
+      <div className="flex min-w-0 flex-col gap-1"><div className="flex flex-wrap items-center gap-2"><p className="text-xs text-black-030">{shortDate(plan.date)}</p>{summary.completed && <span className="inline-flex items-center gap-1 rounded-full bg-black-100 px-2 py-1 text-xs font-semibold text-white"><IconContainer size="sm"><BadgeCheck /></IconContainer>기록 완료</span>}</div><p className="break-words text-sm font-semibold">{plan.memo || "약속"}</p></div>
       {action && <div className="flex shrink-0">{action}</div>}
     </div>
     <div className="flex flex-wrap items-center justify-between gap-2">
