@@ -189,7 +189,7 @@ test("기준일 이전 월말 잔액은 수입·정산·카드·할부·고정�
 });
 
 
-test("전체 초과분을 한 번 차감한 총예산을 생활비·식비로 비례 배분한다", () => {
+test("식비 자체 초과분을 먼저 해당 식비에서 차감하며 총예산 합계는 보존한다", () => {
   const value = data();
   value.finance!.months["2026-11"].groceries = 15000;
   value.expenses = [
@@ -203,10 +203,10 @@ test("전체 초과분을 한 번 차감한 총예산을 생활비·식비로 �
   const food = foodBudgetSummary(value, nextPeriod);
   assert.equal(total.budget, 40000);
   assert.equal(food.base, 15000);
-  assert.equal(food.budget, 8571);
-  assert.equal(food.generalBudget, 31429);
+  assert.equal(food.budget, 0);
+  assert.equal(food.generalBudget, 40000);
   assert.equal(food.budget + food.generalBudget, total.budget);
-  assert.equal(food.remaining, 8571);
+  assert.equal(food.remaining, 0);
   assert.equal(current.nextBudget, food.budget);
 });
 
@@ -220,21 +220,21 @@ test("일반 생활비만 초과해도 식비에 같은 총예산 조정 비율�
   const period = getPeriod("weekly", 1, "2026-11-09");
   const food = foodBudgetSummary(value, period);
   assert.equal(financeSummary(value, period).budget, 50000);
-  assert.equal(food.budget, 10714);
-  assert.equal(food.generalBudget, 39286);
+  assert.equal(food.budget, 27856);
+  assert.equal(food.generalBudget, 22144);
 });
 
-test("식비 잔액은 공유 예산 잔액을 넘지 않고 배정 합계는 짧은 주에도 일치한다", () => {
+test("식비와 일반 생활비의 배정·잔액 합계는 짧은 주에도 전체 예산과 일치한다", () => {
   const value = data();
   value.finance!.months["2026-11"].groceries = 15000;
   value.expenses = [{ id: "other", date: "2026-11-01", amount: 9000, category: "교통", memo: "" }];
   const first = getPeriod("weekly", 1, "2026-11-01");
-  assert.equal(foodBudgetSummary(value, first).remaining, 1000);
+  assert.equal(foodBudgetSummary(value, first).remaining, 2142);
   for (const week of getCalendarMonth("2026-11", 1, value.expenses).weeks) {
     const food = foodBudgetSummary(value, week.period);
     const total = financeSummary(value, week.period);
     assert.equal(food.budget + food.generalBudget, total.budget);
-    assert.ok(food.remaining <= Math.max(0, total.remaining));
+    assert.equal(food.remaining + food.generalRemaining, total.remaining);
   }
   value.finance!.months["2026-11"].budget = 0;
   const food = foodBudgetSummary(value, first);
@@ -277,4 +277,80 @@ test("당일 약속이 있어도 소진된 주 예산보다 큰 하루 기준액
   ];
   value.finance!.plans = [{ id: "plan", date: "2026-11-03", amount: 40000, memo: "" }];
   assert.deepEqual(dailyBudgetStatus(value, "2026-11-03"), { allowance: 0, spent: 5000, overSpent: 5000 });
+});
+
+
+test("식비를 다 쓰면 남은 일반 생활비를 식비 이월로 만들지 않는다", () => {
+  const value = data();
+  value.finance!.months["2026-11"].groceries = 15000;
+  value.expenses = [
+    { id: "first-food", date: "2026-11-01", amount: 2142, category: "식비", memo: "" },
+    { id: "first-other", date: "2026-11-01", amount: 7858, category: "교통", memo: "" },
+    { id: "food", date: "2026-11-03", amount: 15000, category: "식비", memo: "" },
+    { id: "other", date: "2026-11-03", amount: 20000, category: "교통", memo: "" },
+  ];
+  const current = foodBudgetSummary(value, getPeriod("weekly", 1, "2026-11-03"));
+  const next = foodBudgetSummary(value, getPeriod("weekly", 1, "2026-11-09"));
+  assert.equal(current.remaining, 0);
+  assert.equal(current.nextFoodCarry, 0);
+  assert.equal(current.nextBudget, 15000);
+  assert.equal(current.nextAdjustment, 0);
+  assert.equal(next.budget, current.nextBudget);
+  assert.equal(next.carriedIn, 0);
+});
+
+test("일반 생활비가 남아도 식비 자체 초과분은 다음 주 식비에서 차감한다", () => {
+  const value = data();
+  value.finance!.months["2026-11"].groceries = 15000;
+  value.expenses = [
+    { id: "first-food", date: "2026-11-01", amount: 2142, category: "식비", memo: "" },
+    { id: "first-other", date: "2026-11-01", amount: 7858, category: "교통", memo: "" },
+    { id: "food", date: "2026-11-03", amount: 20000, category: "식비", memo: "" },
+  ];
+  const current = foodBudgetSummary(value, getPeriod("weekly", 1, "2026-11-03"));
+  assert.equal(current.nextFoodDebt, 5000);
+  assert.equal(current.nextBudget, 10000);
+  const next = foodBudgetSummary(value, getPeriod("weekly", 1, "2026-11-09"));
+  assert.equal(next.foodDebt, 5000);
+  assert.equal(next.budget, 10000);
+  assert.equal(next.budget + next.generalBudget, financeSummary(value, getPeriod("weekly", 1, "2026-11-09")).budget);
+});
+
+test("전체 예산 초과는 비례 조정하고 식비 자체 초과와 겹치는 금액을 중복 차감하지 않는다", () => {
+  const value = data();
+  value.finance!.months["2026-11"].groceries = 15000;
+  value.expenses = [
+    { id: "first-food", date: "2026-11-01", amount: 2142, category: "식비", memo: "" },
+    { id: "first-other", date: "2026-11-01", amount: 7858, category: "교통", memo: "" },
+    { id: "food", date: "2026-11-03", amount: 15000, category: "식비", memo: "" },
+    { id: "other", date: "2026-11-03", amount: 65000, category: "교통", memo: "" },
+  ];
+  const nextPeriod = getPeriod("weekly", 1, "2026-11-09");
+  let next = foodBudgetSummary(value, nextPeriod);
+  assert.equal(next.budget, 12857); // 15,000 - food's proportional share of the 10,000 total debt.
+  value.expenses[2].amount = 20000;
+  value.expenses[3].amount = 60000;
+  next = foodBudgetSummary(value, nextPeriod);
+  assert.equal(next.foodDebt, 5000);
+  assert.equal(next.proportionalCut, 2143);
+  assert.equal(next.budget, 10000); // 15,000 - 5,000, never minus 5,000 AND 2,143.
+  assert.equal(next.budget + next.generalBudget, 60000);
+});
+
+
+test("일반 생활비가 전체 예산을 넘겨도 미사용 식비를 당장 0원으로 만들지 않는다", () => {
+  const value = data();
+  value.finance!.months["2026-11"].groceries = 15000;
+  value.expenses = [
+    { id: "first-food", date: "2026-11-01", amount: 2142, category: "식비", memo: "" },
+    { id: "first-other", date: "2026-11-01", amount: 7858, category: "교통", memo: "" },
+    { id: "other", date: "2026-11-03", amount: 80000, category: "교통", memo: "" },
+  ];
+  const period = getPeriod("weekly", 1, "2026-11-03");
+  const food = foodBudgetSummary(value, period);
+  assert.equal(financeSummary(value, period).remaining, -10000);
+  assert.equal(food.remaining, 15000);
+  assert.equal(food.generalRemaining, -25000);
+  assert.equal(food.nextFoodCarry, 15000);
+  assert.equal(food.nextBudget, 27857);
 });

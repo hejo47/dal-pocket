@@ -112,23 +112,47 @@ export function foodBudgetSummary(data: PocketData, period: Period) {
   const food = data.expenses.filter((expense) => expense.category === "식비" || finance.payments[expense.id]?.groceries);
   const allocation = (start: string, end: string) => Math.floor(rate * Number(end.slice(8)) / 7) - Math.floor(rate * (Number(start.slice(8)) - 1) / 7);
   const base = allocation(period.start, period.end);
-  const total = financeSummary(data, period);
-  const baseTotal = allocatedBudget(data, period);
-  // Deduct overspending from the shared pool once, then distribute that pool.
-  // Food must never carry a second, independent debt on top of the total debt.
-  const shareOf = (pool: number, totalBase: number, foodBase: number) => totalBase > 0 ? Math.floor(pool * Math.min(foodBase, totalBase) / totalBase) : 0;
-  const budget = shareOf(total.budget, baseTotal, base);
+  // Carry only the food envelope's actual remainder. The shared pool's
+  // unspent general allowance must never become a food carryover.
+  function calculate(scope: Period, foodCarry: number) {
+    const total = financeSummary(data, scope);
+    const totalBase = allocatedBudget(data, scope);
+    const foodBase = allocation(scope.start, scope.end);
+    const ownDebt = Math.max(0, -foodCarry);
+    const ownCarry = Math.max(0, foodCarry);
+    const proportionalBase = totalBase > 0 ? Math.floor(Math.min(total.budget, totalBase) * Math.min(foodBase, totalBase) / totalBase) : 0;
+    const proportionalCut = Math.max(0, foodBase - proportionalBase);
+    // Food's own debt is already part of the total overspend. Apply the
+    // larger restriction, rather than subtracting that same debt twice.
+    const signedBudget = Math.min(total.budget, foodBase + ownCarry - Math.max(ownDebt, proportionalCut));
+    const budget = Math.max(0, signedBudget);
+    const spent = sumExpenses(food.filter((expense) => expense.date >= scope.start && expense.date <= scope.end));
+    return { budget, spent, balance: signedBudget - spent, total, ownDebt, ownCarry, proportionalCut };
+  }
+  let carry = 0;
+  if (period.mode === "weekly") {
+    let cursor = month + "-01";
+    while (cursor < period.start) {
+      const previous = getPeriod("weekly", data.weekStartsOn, cursor);
+      carry = calculate(previous, carry).balance;
+      cursor = offsetDate(previous.end, 1);
+    }
+  }
+  const current = calculate(period, carry);
+  const { budget, spent, total } = current;
   const carried = Math.max(0, base - budget);
   const carriedIn = Math.max(0, budget - base);
-  const spent = sumExpenses(food.filter((expense) => expense.date >= period.start && expense.date <= period.end));
   const borrowed = Math.max(0, spent - budget);
-  const remaining = Math.max(0, Math.min(budget - spent, total.remaining));
+  const remaining = budget - spent;
   const nextDate = offsetDate(period.end, 1);
   const nextPeriod = nextDate.slice(0, 7) === month && period.mode === "weekly" ? getPeriod("weekly", data.weekStartsOn, nextDate) : null;
   const nextBase = nextPeriod ? allocation(nextPeriod.start, nextPeriod.end) : null;
-  const nextBudget = nextPeriod ? shareOf(financeSummary(data, nextPeriod).budget, allocatedBudget(data, nextPeriod), nextBase!) : null;
+  const nextBudget = nextPeriod ? calculate(nextPeriod, current.balance).budget : null;
   const nextAdjustment = nextBudget !== null ? nextBudget - nextBase! : 0;
-  return { configured: rate > 0, base, carriedIn, nextBase, nextAdjustment, budget, spent, carried, borrowed, remaining, nextBudget, nextPeriod, generalBudget: total.budget - budget, generalRemaining: Math.max(0, total.remaining - remaining) };
+  return { configured: rate > 0, base, carriedIn, nextBase, nextAdjustment, budget, spent, carried, borrowed, remaining, nextBudget, nextPeriod,
+    foodDebt: current.ownDebt, foodCarry: current.ownCarry, proportionalCut: current.proportionalCut,
+    nextFoodCarry: Math.max(0, current.balance), nextFoodDebt: Math.max(0, -current.balance),
+    generalBudget: total.budget - budget, generalRemaining: total.remaining - remaining };
 }
 export function financeSummary(data: PocketData, period: Period) {
   const month = period.start.slice(0, 7);
