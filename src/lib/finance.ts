@@ -5,7 +5,7 @@ export type MoneyEntry = { id: string; date: string; amount: number; memo: strin
 export type PlanEntry = MoneyEntry & { expenseIds?: string[] };
 export type SavingsEntry = MoneyEntry & { direction: "deposit" | "withdraw" };
 export type Installment = MoneyEntry & { months: number };
-export type FixedExpense = MoneyEntry & { endMonth?: string; includeInBudget?: boolean; method?: "cash" | "card"; cadence?: "monthly" | "sessions"; sessionsPerPayment?: number; sessionDates?: string[]; paymentDates?: string[] };
+export type FixedExpense = MoneyEntry & { kind?: "utilities"; endMonth?: string; includeInBudget?: boolean; method?: "cash" | "card"; cadence?: "monthly" | "sessions"; sessionsPerPayment?: number; sessionDates?: string[]; paymentDates?: string[] };
 export type Settlement = { count: number; date: string };
 export type Repayment = { amount: number; date: string };
 export type Payment = { paidBy?: "self" | "other"; repayments?: Repayment[]; gross: number; split: number; method: "cash" | "card"; settled: boolean; settledDate: string; note?: string; groceries?: boolean; settlements?: Settlement[] };
@@ -32,7 +32,7 @@ export function isFinance(value: unknown): value is Finance {
     && (data.savings === undefined || Array.isArray(data.savings) && data.savings.length <= 10000 && data.savings.every((item) => entry(item) && ["deposit", "withdraw"].includes(item.direction)))
     && (data.noSpendDates === undefined || Array.isArray(data.noSpendDates) && data.noSpendDates.length <= 10000 && data.noSpendDates.every(isDateKey))
     && Array.isArray(data.installments) && data.installments.length <= 1000 && data.installments.every((item) => entry(item) && Number.isInteger(item.months) && item.months >= 2 && item.months <= 60)
-    && (data.fixedExpenses === undefined || Array.isArray(data.fixedExpenses) && data.fixedExpenses.length <= 1000 && data.fixedExpenses.every((item) => entry(item) && (item.method === undefined || ["cash", "card"].includes(item.method)) && (item.cadence === undefined || ["monthly", "sessions"].includes(item.cadence)) && (item.cadence !== "sessions" || Number.isInteger(item.sessionsPerPayment) && item.sessionsPerPayment! >= 1 && item.sessionsPerPayment! <= 100 && Array.isArray(item.sessionDates) && item.sessionDates.length <= 10000 && item.sessionDates.every((date) => isDateKey(date) && date >= item.date) && Array.isArray(item.paymentDates) && item.paymentDates.length >= 1 && item.paymentDates.length <= 10000 && item.paymentDates.every((date) => isDateKey(date) && date >= item.date)) && (item.includeInBudget === undefined || typeof item.includeInBudget === "boolean") && (!item.endMonth || isDateKey(item.endMonth + "-01") && item.endMonth >= item.date.slice(0, 7))))
+    && (data.fixedExpenses === undefined || Array.isArray(data.fixedExpenses) && data.fixedExpenses.length <= 1000 && data.fixedExpenses.every((item) => entry(item) && (item.kind === undefined || item.kind === "utilities" && item.cadence === "monthly" && item.endMonth === item.date.slice(0, 7) && item.includeInBudget !== true) && (item.method === undefined || ["cash", "card"].includes(item.method)) && (item.cadence === undefined || ["monthly", "sessions"].includes(item.cadence)) && (item.cadence !== "sessions" || Number.isInteger(item.sessionsPerPayment) && item.sessionsPerPayment! >= 1 && item.sessionsPerPayment! <= 100 && Array.isArray(item.sessionDates) && item.sessionDates.length <= 10000 && item.sessionDates.every((date) => isDateKey(date) && date >= item.date) && Array.isArray(item.paymentDates) && item.paymentDates.length >= 1 && item.paymentDates.length <= 10000 && item.paymentDates.every((date) => isDateKey(date) && date >= item.date)) && (item.includeInBudget === undefined || typeof item.includeInBudget === "boolean") && (!item.endMonth || isDateKey(item.endMonth + "-01") && item.endMonth >= item.date.slice(0, 7))))
     && !!data.payments && typeof data.payments === "object" && Object.values(data.payments).every((item) => item && amount(item.gross) && (item.paidBy === undefined || ["self", "other"].includes(item.paidBy)) && (item.repayments === undefined || Array.isArray(item.repayments) && item.repayments.length <= 100 && item.repayments.every((sent) => Number.isSafeInteger(sent.amount) && sent.amount > 0 && isDateKey(sent.date)) && (item.paidBy !== "other" || item.repayments.reduce((sum, sent) => sum + sent.amount, 0) <= Math.ceil(item.gross / item.split))) && Number.isInteger(item.split) && item.split >= 1 && item.split <= 100 && ["cash", "card"].includes(item.method) && (item.groceries === undefined || typeof item.groceries === "boolean") && (item.settlements === undefined || Array.isArray(item.settlements) && item.settlements.length <= 100 && item.settlements.every((receipt) => receipt && Number.isInteger(receipt.count) && receipt.count > 0 && isDateKey(receipt.date)) && (item.paidBy === "other" || item.settlements.reduce((sum,receipt) => sum + receipt.count, 0) <= item.split - 1)) && typeof item.settled === "boolean" && isDateKey(item.settledDate) && (item.note === undefined || typeof item.note === "string" && item.note.length <= 200));
 }
 // Resolve actual records, so editing/deleting a linked expense updates the result too.
@@ -103,6 +103,15 @@ export const financeOf = (data: PocketData): Finance => ({ ...emptyFinance(), ..
 export function monthDays(month: string) { return Number(getPeriod("monthly", 1, `${month}-01`).end.slice(8)); }
 export function monthSettings(data: PocketData, month: string) {
   return financeOf(data).months[month] ?? { budget: 0, groceries: 0 };
+}
+export function changeSessionStart(item: FixedExpense, date: string): FixedExpense {
+  if (!isDateKey(date)) throw new Error("INVALID_SESSION_START");
+  const paymentDates = [...(item.paymentDates ?? [])];
+  if (paymentDates[0] === item.date) paymentDates[0] = date;
+  if (paymentDates.some((paid) => paid < date) || (item.sessionDates ?? []).some((attended) => attended < date)) {
+    throw new Error("SESSION_START_AFTER_RECORDS");
+  }
+  return { ...item, date, paymentDates };
 }
 export function fixedDueDate(item: FixedExpense, month: string) {
   if (item.cadence === "sessions") return (item.paymentDates ?? []).find((date) => date.slice(0, 7) === month) ?? null;

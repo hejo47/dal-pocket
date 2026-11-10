@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createDemoData, getCalendarMonth, getPeriod, offsetDate } from "../src/lib/pocket.ts";
-import { allocatedBudget, cashFlow, dailySpendingAllowance, settlementSummary, unsettledExpenses, resizeSettlements, fixedDueDate, fixedTotal, foodBudgetSummary, emptyFinance, financeSummary, installmentDue, isFinance, monthSettings, planSummary, linkPlanExpenses, dailyBudgetStatus, payableSummary, resizeRepayments } from "../src/lib/finance.ts";
+import { allocatedBudget, cashFlow, dailySpendingAllowance, settlementSummary, unsettledExpenses, resizeSettlements, fixedDueDate, fixedTotal, foodBudgetSummary, emptyFinance, financeSummary, installmentDue, isFinance, monthSettings, planSummary, linkPlanExpenses, dailyBudgetStatus, payableSummary, resizeRepayments, changeSessionStart } from "../src/lib/finance.ts";
 function data() { const value = createDemoData("2026-11-02"); value.expenses=[]; value.isDemo=false; value.finance={...emptyFinance(),months:{"2026-11":{budget:300000,groceries:30000}}}; return value; }
 test("월별 하나의 예산을 모든 짧은 주에 배분해도 합계가 동일하다",()=>{const value=data();const month=getCalendarMonth("2026-11",1,[]);assert.equal(month.weeks.reduce((sum,week)=>sum+allocatedBudget(value,week.period),0),300000);assert.equal(allocatedBudget(value,getPeriod("weekly",1,"2026-11-01")),10000);assert.equal(monthSettings(value,"2026-10").budget,0);});
 test("주 경계 이동이 월초 하루짜리 주를 건너뛰지 않는다",()=>{const october=getPeriod("weekly",1,"2026-10-31");const first=getPeriod("weekly",1,offsetDate(october.end,1));assert.equal(first.start,"2026-11-01");assert.equal(first.end,"2026-11-01");assert.equal(getPeriod("weekly",1,offsetDate(first.end,1)).start,"2026-11-02");});
@@ -426,4 +426,48 @@ test("약속 예산 초과액은 연결된 여러 지출의 본인 부담 합계
   assert.equal(planSummary(value, value.finance.plans[0]).overSpent, 20000);
   value.expenses[0].amount = 10000;
   assert.equal(planSummary(value, value.finance.plans[0]).overSpent, 0);
+});
+
+
+test("학원 첫 결제일 정정은 최초 결제만 옮기고 이후 결제·수강 기록을 보존한다", () => {
+  const item = { id: "class", date: "2026-11-18", amount: 40000, memo: "학원", cadence: "sessions" as const, sessionsPerPayment: 4, paymentDates: ["2026-11-18", "2026-12-01"], sessionDates: ["2026-11-19"] };
+  const updated = changeSessionStart(item, "2026-11-01");
+  assert.deepEqual(updated.paymentDates, ["2026-11-01", "2026-12-01"]);
+  assert.deepEqual(updated.sessionDates, ["2026-11-19"]);
+  assert.deepEqual(item.paymentDates, ["2026-11-18", "2026-12-01"]);
+  assert.throws(() => changeSessionStart(item, "2026-11-20"));
+  const value = data();
+  value.finance!.fixedExpenses = [updated];
+  assert.ok(isFinance(value.finance));
+  assert.equal(fixedTotal(value, "2026-11-01", "2026-11-30"), 40000);
+  assert.equal(fixedTotal(value, "2026-12-01", "2026-12-31"), 40000);
+});
+
+
+test("월별 공과금은 생활 예산에서 제외하고 현금·카드 출금에 한 번만 반영한다", () => {
+  const value = data();
+  const finance = value.finance!;
+  finance.openingDate = "2026-11-01";
+  finance.openingBalance = 200000;
+  finance.billingDay = 15;
+  finance.closingDay = 31;
+  finance.billingOffset = 1;
+  finance.fixedExpenses = [
+    { id: "electric", date: "2026-11-10", amount: 30000, memo: "전기", kind: "utilities", cadence: "monthly", endMonth: "2026-11", includeInBudget: false, method: "cash" },
+    { id: "gas", date: "2026-11-12", amount: 20000, memo: "가스", kind: "utilities", cadence: "monthly", endMonth: "2026-11", includeInBudget: false, method: "card" },
+    { id: "rent", date: "2026-11-01", amount: 40000, memo: "월세", method: "cash" },
+  ];
+  assert.ok(isFinance(finance));
+  assert.equal(fixedTotal(value, "2026-11-01", "2026-11-30"), 90000);
+  assert.equal(fixedTotal(value, "2026-12-01", "2026-12-31"), 40000);
+  assert.equal(financeSummary(value, getPeriod("monthly", 1, "2026-11-01")).spent, 0);
+  assert.equal(cashFlow(value, "2026-11").balance, 130000);
+  assert.equal(cashFlow(value, "2026-12").dueThisMonth, 20000);
+  assert.equal(cashFlow(value, "2026-12").balance, 70000);
+  assert.equal(cashFlow(value, "2027-01").dueThisMonth, 0);
+  finance.fixedExpenses[0].endMonth = "2026-12";
+  assert.equal(isFinance(finance), false);
+  finance.fixedExpenses[0].endMonth = "2026-11";
+  finance.fixedExpenses[0].includeInBudget = true;
+  assert.equal(isFinance(finance), false);
 });
