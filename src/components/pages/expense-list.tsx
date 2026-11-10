@@ -5,15 +5,31 @@ import { ChevronRight } from "lucide-react";
 import { usePocket } from "@/components/providers/pocket-provider";
 import { IconContainer } from "@/components/ui/icon-container";
 
-import { financeOf, settlementSummary } from "@/lib/finance";
+import { financeOf, settlementSummary, payableSummary } from "@/lib/finance";
 import { formatMoney, shortDate, sumExpenses } from "@/lib/pocket";
+import type { Payment } from "@/lib/finance";
 import type { Expense } from "@/lib/pocket";
 
 const expenseCard = "flex w-full items-center gap-3 rounded-xl border border-black-010 bg-black-002 px-3 py-4";
 
+function PaymentDetails({ payment, ownAmount }: { payment: Payment; ownAmount: number }) {
+  if (payment.paidBy === "other") {
+    const summary = payableSummary(payment, ownAmount);
+    return <>
+      <span className="text-xs leading-150 text-black-030">다른 사람 결제 · 총 {formatMoney(payment.gross)}원 ÷ {payment.split}명</span>
+      <span className="text-xs leading-150 text-black-030">{summary.outstanding > 0 ? `보낼 정산 ${formatMoney(summary.outstanding)}원` : `송금 완료 · ${formatMoney(summary.sentAmount)}원`}</span>
+    </>;
+  }
+  const summary = settlementSummary(payment, ownAmount);
+  return <>
+    <span className="text-xs leading-150 text-black-030">{payment.method === "card" ? "신용카드" : "현금·체크"} · 총 {formatMoney(payment.gross)}원 ÷ {payment.split}명{payment.split > 1 ? ` · 정산 ${summary.count}/${summary.people}명 받음` : ""}</span>
+    {payment.split > 1 && <span className="text-xs leading-150 text-black-030">받을 금액 {formatMoney(summary.outstanding)}원</span>}
+  </>;
+}
+
 export function ExpenseList({ expenses, grouped = false, onSelect }: { expenses: Expense[]; grouped?: boolean; onSelect?: (expense: Expense) => void }) {
   const { openEditor, today, data } = usePocket();
-  const plans = financeOf(data).plans;
+  const { plans, payments } = financeOf(data);
   if (!expenses.length) return <div className={expenseCard}>
     <div className="flex min-w-0 flex-1 flex-col gap-1">
       <p className="text-sm font-semibold leading-140">잘하고 있어요!</p>
@@ -27,7 +43,7 @@ export function ExpenseList({ expenses, grouped = false, onSelect }: { expenses:
     return <section key={date} className="flex flex-col gap-2">
       {grouped && <div className="flex items-center justify-between gap-3 text-xs leading-150 text-black-030"><h2>{date === today ? "오늘" : shortDate(date)}</h2><span className="font-numbers font-semibold text-black-100">{formatMoney(sumExpenses(group))}원</span></div>}
       <div className="flex flex-col gap-2">{group.map((expense) => <button key={expense.id} data-expense-id={expense.id} type="button" onClick={() => (onSelect ?? openEditor)(expense)} className={expenseCard + " cursor-pointer text-left hover:border-black-020"} aria-label={`${expense.memo || expense.category}, ${formatMoney(expense.amount)}원, 수정`}>
-        <span className="flex min-w-0 flex-1 flex-col justify-center gap-1"><span className="break-words text-sm font-semibold leading-140">{expense.memo || expense.category}</span><span className="text-xs leading-140 text-black-030">{expense.category}</span>{financeOf(data).payments[expense.id]?.groceries && <span className="text-xs leading-150 text-black-030">자취 식료품 · 식비에 합산</span>}{plans.filter((plan) => plan.expenseIds?.includes(expense.id)).map((plan) => <span key={plan.id} className="text-xs leading-150 text-black-030">연결된 약속 · {plan.memo || shortDate(plan.date)}</span>)}{financeOf(data).payments[expense.id] && <span className="text-xs leading-150 text-black-030">{financeOf(data).payments[expense.id].method === "card" ? "신용카드" : "현금·체크"} · 총 {formatMoney(financeOf(data).payments[expense.id].gross)}원 ÷ {financeOf(data).payments[expense.id].split}명 {financeOf(data).payments[expense.id].split > 1 ? "· 정산 " + settlementSummary(financeOf(data).payments[expense.id]).count + "/" + (financeOf(data).payments[expense.id].split - 1) + "명 받음" : ""}</span>}{financeOf(data).payments[expense.id]?.split > 1 && <span className="text-xs leading-150 text-black-030">받을 금액 {formatMoney(settlementSummary(financeOf(data).payments[expense.id], expense.amount).outstanding)}원</span>}{financeOf(data).payments[expense.id]?.note && <span className="break-words text-xs leading-150 text-black-030">메모: {financeOf(data).payments[expense.id].note}</span>}</span>
+        <span className="flex min-w-0 flex-1 flex-col justify-center gap-1"><span className="break-words text-sm font-semibold leading-140">{expense.memo || expense.category}</span><span className="text-xs leading-140 text-black-030">{expense.category}</span>{payments[expense.id]?.groceries && <span className="text-xs leading-150 text-black-030">자취 식료품 · 식비에 합산</span>}{plans.filter((plan) => plan.expenseIds?.includes(expense.id)).map((plan) => <span key={plan.id} className="text-xs leading-150 text-black-030">연결된 약속 · {plan.memo || shortDate(plan.date)}</span>)}{payments[expense.id] && <PaymentDetails payment={payments[expense.id]} ownAmount={expense.amount} />}{payments[expense.id]?.note && <span className="break-words text-xs leading-150 text-black-030">메모: {payments[expense.id].note}</span>}</span>
         <span className="font-numbers shrink-0 text-sm font-semibold leading-150">−{formatMoney(expense.amount)}원</span>
         <IconContainer className="text-black-030"><ChevronRight /></IconContainer>
       </button>)}</div>

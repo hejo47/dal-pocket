@@ -25,6 +25,7 @@ export function PlanRecord({ plan, action, onExpenseSelect }: { plan: PlanEntry;
       <p className="text-xs text-black-030">예산 <span className="font-numbers">{formatMoney(plan.amount)}원</span>{summary.completed && <> · 실제 <span className="font-numbers font-semibold text-black-100">{formatMoney(summary.actual)}원</span></>}</p>
       <PillButton size="sm" variant="ghost" onClick={() => { setLinkOpen(true); }}><IconContainer size="sm"><Link2 /></IconContainer>{summary.completed ? `연결 수정 · ${summary.expenses.length}건` : "지출 내역 연결"}</PillButton>
     </div>
+    {summary.completed && summary.overSpent > 0 && <p className="text-xs leading-150 text-red-2">약속 예산 <span className="font-numbers font-semibold">{formatMoney(summary.overSpent)}원</span> 초과</p>}
     {summary.completed && <details><summary className="cursor-pointer text-xs text-black-030">연결된 내역 보기</summary><div className="flex flex-col gap-1 pt-2">{summary.expenses.map((expense) => <button key={expense.id} type="button" className="flex cursor-pointer items-center justify-between gap-3 rounded-lg bg-black-002 px-3 py-2 text-left text-xs" onClick={() => (onExpenseSelect ?? pocket.openEditor)(expense)}><span className="min-w-0 break-words">{shortDate(expense.date)} · {expense.memo || expense.category}</span><span className="font-numbers shrink-0 font-semibold">{formatMoney(expense.amount)}원</span></button>)}</div></details>}
     {linkOpen && <PlanExpensePicker plan={plan} onClose={() => setLinkOpen(false)} />}
   </div>;

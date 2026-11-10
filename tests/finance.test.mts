@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createDemoData, getCalendarMonth, getPeriod, offsetDate } from "../src/lib/pocket.ts";
-import { allocatedBudget, cashFlow, dailySpendingAllowance, settlementSummary, unsettledExpenses, resizeSettlements, fixedDueDate, fixedTotal, foodBudgetSummary, emptyFinance, financeSummary, installmentDue, isFinance, monthSettings, planSummary, linkPlanExpenses, dailyBudgetStatus } from "../src/lib/finance.ts";
+import { allocatedBudget, cashFlow, dailySpendingAllowance, settlementSummary, unsettledExpenses, resizeSettlements, fixedDueDate, fixedTotal, foodBudgetSummary, emptyFinance, financeSummary, installmentDue, isFinance, monthSettings, planSummary, linkPlanExpenses, dailyBudgetStatus, payableSummary, resizeRepayments } from "../src/lib/finance.ts";
 function data() { const value = createDemoData("2026-11-02"); value.expenses=[]; value.isDemo=false; value.finance={...emptyFinance(),months:{"2026-11":{budget:300000,groceries:30000}}}; return value; }
 test("월별 하나의 예산을 모든 짧은 주에 배분해도 합계가 동일하다",()=>{const value=data();const month=getCalendarMonth("2026-11",1,[]);assert.equal(month.weeks.reduce((sum,week)=>sum+allocatedBudget(value,week.period),0),300000);assert.equal(allocatedBudget(value,getPeriod("weekly",1,"2026-11-01")),10000);assert.equal(monthSettings(value,"2026-10").budget,0);});
 test("주 경계 이동이 월초 하루짜리 주를 건너뛰지 않는다",()=>{const october=getPeriod("weekly",1,"2026-10-31");const first=getPeriod("weekly",1,offsetDate(october.end,1));assert.equal(first.start,"2026-11-01");assert.equal(first.end,"2026-11-01");assert.equal(getPeriod("weekly",1,offsetDate(first.end,1)).start,"2026-11-02");});
@@ -353,4 +353,77 @@ test("일반 생활비가 전체 예산을 넘겨도 미사용 식비를 당장 
   assert.equal(food.generalRemaining, -25000);
   assert.equal(food.nextFoodCarry, 15000);
   assert.equal(food.nextBudget, 27857);
+});
+
+
+test("다른 사람이 결제한 지출은 내 부담만 예산에 포함하고 카드값·받을 정산에서 제외한다", () => {
+  const value = data();
+  value.finance!.openingDate = "2026-11-01";
+  value.finance!.openingBalance = 100000;
+  value.expenses = [{ id: "other-paid", date: "2026-11-03", amount: 30000, category: "식비", memo: "" }];
+  value.finance!.payments["other-paid"] = { gross: 90000, split: 3, method: "card", paidBy: "other", settled: false, settledDate: "2026-11-03" };
+  const flow = cashFlow(value, "2026-11");
+  assert.equal(flow.balance, 100000);
+  assert.equal(flow.payable, 30000);
+  assert.equal(flow.cardBill, 0);
+  assert.equal(flow.cardOut, 0);
+  assert.equal(flow.dueThisMonth, 0);
+  assert.equal(flow.receivable, 0);
+  assert.equal(flow.availableBalance, 70000);
+  assert.equal(financeSummary(value, getPeriod("monthly", 1, "2026-11-03")).spent, 30000);
+  assert.equal(settlementSummary(value.finance!.payments["other-paid"]).outstanding, 0);
+  assert.equal(payableSummary(value.finance!.payments["other-paid"]).outstanding, 30000);
+  assert.ok(isFinance(value.finance));
+});
+
+test("보낸 정산은 송금일의 현금에 한 번만 반영하고 월말 미지급액을 구분한다", () => {
+  const value = data();
+  value.finance!.openingDate = "2026-11-01";
+  value.finance!.openingBalance = 100000;
+  value.expenses = [{ id: "other-paid", date: "2026-11-03", amount: 30000, category: "식비", memo: "" }];
+  value.finance!.payments["other-paid"] = { gross: 90000, split: 3, method: "card", paidBy: "other", settled: false, settledDate: "2026-11-03", repayments: [{ amount: 10000, date: "2026-11-06" }, { amount: 20000, date: "2026-12-01" }] };
+  const november = cashFlow(value, "2026-11");
+  const december = cashFlow(value, "2026-12");
+  assert.equal(november.balance, 90000);
+  assert.equal(november.payable, 20000);
+  assert.equal(november.repaidMonth, 10000);
+  assert.equal(december.balance, 70000);
+  assert.equal(december.payable, 0);
+  assert.equal(december.repaidMonth, 20000);
+  assert.equal(december.repaymentOut, 30000);
+  assert.equal(financeSummary(value, getPeriod("monthly", 1, "2026-11-03")).spent, 30000);
+});
+
+test("송금 상태 변경은 기존 송금일을 보존하며 내 부담액보다 큰 송금을 저장하지 않는다", () => {
+  const value = data();
+  const payment = { gross: 60000, split: 2, method: "cash" as const, paidBy: "other" as const, settled: false, settledDate: "2026-11-01", repayments: [{ amount: 10000, date: "2026-11-01" }] };
+  assert.deepEqual(resizeRepayments(payment, 30000, "2026-11-10"), [{ amount: 10000, date: "2026-11-01" }, { amount: 20000, date: "2026-11-10" }]);
+  assert.deepEqual(resizeRepayments(payment, 5000, "2026-11-10"), [{ amount: 5000, date: "2026-11-01" }]);
+  value.finance!.payments.p = payment;
+  assert.ok(isFinance(value.finance));
+  payment.repayments.push({ amount: 25000, date: "2026-11-10" });
+  assert.equal(isFinance(value.finance), false);
+});
+
+test("이전 월 잔액 역산에도 상대가 낸 원금 대신 실제 보낸 정산금만 반영한다", () => {
+  const value = data();
+  value.finance!.openingDate = "2026-11-01";
+  value.finance!.openingBalance = 100000;
+  value.expenses = [{ id: "other-paid", date: "2026-10-03", amount: 30000, category: "식비", memo: "" }];
+  value.finance!.payments["other-paid"] = { gross: 90000, split: 3, method: "card", paidBy: "other", settled: false, settledDate: "2026-10-03", repayments: [{ amount: 30000, date: "2026-10-06" }] };
+  assert.equal(cashFlow(value, "2026-09").balance, 130000);
+  assert.equal(cashFlow(value, "2026-10").balance, 100000);
+});
+
+test("약속 예산 초과액은 연결된 여러 지출의 본인 부담 합계로 계산한다", () => {
+  const value = data();
+  value.finance!.plans = [{ id: "plan", date: "2026-11-03", amount: 50000, memo: "" }];
+  value.expenses = [
+    { id: "dinner", date: "2026-11-03", amount: 40000, category: "식비", memo: "" },
+    { id: "cafe", date: "2026-11-03", amount: 30000, category: "카페", memo: "" },
+  ];
+  value.finance = linkPlanExpenses(value, "plan", ["dinner", "cafe"]);
+  assert.equal(planSummary(value, value.finance.plans[0]).overSpent, 20000);
+  value.expenses[0].amount = 10000;
+  assert.equal(planSummary(value, value.finance.plans[0]).overSpent, 0);
 });
