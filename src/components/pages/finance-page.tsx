@@ -9,6 +9,7 @@ import { SpendingBreakdown } from "@/components/pages/analysis-page";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MoneyRow } from "@/components/ui/money-row";
 import { SavingsSection } from "@/components/pages/savings-section";
+import { InstallmentsSection } from "@/components/pages/installments-section";
 import { FixedExpenses } from "@/components/pages/fixed-expenses";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -18,12 +19,12 @@ import { RecordRemoveButton } from "@/components/ui/record-remove-button";
 import { PillButton } from "@/components/ui/pill-button";
 import { ScreenTitle, PageSkeleton } from "@/components/ui/screen-title";
 import { financeOf, cashFlow, installmentDue, nextMonth } from "@/lib/finance";
-import type { Finance, Installment } from "@/lib/finance";
+import type { Finance } from "@/lib/finance";
 import { formatMoney, isDateKey, parseAmount, validAmount } from "@/lib/pocket";
 function FinanceView({ initialMonth }: { initialMonth: string }) {
  const pocket = usePocket(); const finance = financeOf(pocket.data);
- const [month,setMonth] = useState(initialMonth); const [kind,setKind] = useState<"incomes"|"installments">("incomes");
- const [date,setDate] = useState(pocket.today); const [amount,setAmount] = useState(""); const [memo,setMemo] = useState(""); const [months,setMonths] = useState("3");
+ const [month,setMonth] = useState(initialMonth);
+ const [date,setDate] = useState(pocket.today); const [amount,setAmount] = useState(""); const [memo,setMemo] = useState("");
  const [balance,setBalance] = useState(String(finance.openingBalance)); const [openingDate,setOpeningDate] = useState(finance.openingDate === "2000-01-01" ? pocket.today : finance.openingDate);
  const [billingDay,setBillingDay] = useState(String(finance.billingDay)); const [closingDay,setClosingDay] = useState(String(finance.closingDay ?? 31)); const [billingOffset,setBillingOffset] = useState(String(finance.billingOffset ?? 1));
  const [registerOpen, setRegisterOpen] = useState(false);
@@ -50,11 +51,15 @@ function FinanceView({ initialMonth }: { initialMonth: string }) {
  <FieldLabel htmlFor="closing-day">카드 이용 마감일 (말일은 31)</FieldLabel><TextField id="closing-day" type="number" required min={1} max={31} value={closingDay} onChange={(event)=>setClosingDay(event.target.value)} /><FieldLabel htmlFor="billing-offset">마감 월로부터 출금 월</FieldLabel><SelectField id="billing-offset" value={billingOffset} options={[{value:"0",label:"마감한 당월"},{value:"1",label:"다음 달"},{value:"2",label:"다다음 달"}]} onChange={(event)=>setBillingOffset(event.target.value)} /><FieldLabel htmlFor="billing-day">카드 결제일</FieldLabel><TextField id="billing-day" type="number" required min={1} max={31} value={billingDay} onChange={(event)=>setBillingDay(event.target.value)} /><FieldHint>예: 마감일 31 · 다음 달 · 결제일 15 → 전월 1일~말일 사용분이 이번 달 15일에 출금됩니다. 이 화면의 잔액은 월말까지 등록된 예정 수입·출금을 포함한 예상치입니다.</FieldHint><PillButton type="submit">기준 저장</PillButton></form></DialogContent></Dialog>
  <Dialog open={registerOpen} onOpenChange={setRegisterOpen}>
    <DialogContent>
-     <DialogHeader><DialogTitle>{kind === "incomes" ? "수입 등록" : "할부 등록"}</DialogTitle><DialogDescription>날짜와 금액을 입력해주세요.</DialogDescription></DialogHeader>
- <form className="pocket-dialog-scroll flex flex-col gap-3" onSubmit={(event)=>{event.preventDefault(); const parsed=parseAmount(amount); if(!validAmount(parsed)||!date||kind === "installments" && (Number(months)<2 || Number(months)>60))return; const item={id:crypto.randomUUID(),date,amount:parsed,memo,months:Number(months)};save({...finance,[kind]:[...finance[kind],item]});setAmount("");setMemo("");setRegisterOpen(false);}}><FieldLabel htmlFor="finance-date">{kind === "installments" ? "첫 납부 월의 날짜" : "예정·발생 날짜"}</FieldLabel><DateField id="finance-date" required value={date} onValueChange={(value) => setDate(value)} /><FieldLabel htmlFor="finance-amount">{kind === "installments" ? "할부 원금 총액 (무이자 기준)" : "금액"}</FieldLabel><TextField id="finance-amount" required inputMode="numeric" value={amount} onChange={(event)=>setAmount(event.target.value.replace(/\D/g,""))} /><FieldLabel htmlFor="finance-memo">내용·메모</FieldLabel><TextField id="finance-memo" maxLength={80} value={memo} onChange={(event)=>setMemo(event.target.value)} />{kind === "installments" && <><FieldLabel htmlFor="installment-months">할부 개월 수</FieldLabel><TextField id="installment-months" type="number" min={2} max={60} required value={months} onChange={(event)=>setMonths(event.target.value)} /><FieldHint>납부일은 현금·카드 설정의 카드 결제일을 따릅니다. 원금은 개월 수로 배분하며 이자는 포함하지 않습니다.</FieldHint></>}<PillButton type="submit">등록</PillButton></form>
+     <DialogHeader><DialogTitle>수입 등록</DialogTitle><DialogDescription>날짜와 금액을 입력해주세요.</DialogDescription></DialogHeader>
+ <form className="pocket-dialog-scroll flex flex-col gap-3" onSubmit={(event)=>{event.preventDefault(); const parsed=parseAmount(amount); if(!validAmount(parsed)||!isDateKey(date))return; const item={id:crypto.randomUUID(),date,amount:parsed,memo};save({...finance,incomes:[...finance.incomes,item]});setAmount("");setMemo("");setRegisterOpen(false);}}><FieldLabel htmlFor="finance-date">예정·발생 날짜</FieldLabel><DateField id="finance-date" required value={date} onValueChange={setDate} /><FieldLabel htmlFor="finance-amount">금액</FieldLabel><TextField id="finance-amount" required inputMode="numeric" value={amount} onChange={(event)=>setAmount(event.target.value.replace(/\D/g,""))} /><FieldLabel htmlFor="finance-memo">내용·메모</FieldLabel><TextField id="finance-memo" maxLength={80} value={memo} onChange={(event)=>setMemo(event.target.value)} /><PillButton type="submit">등록</PillButton></form>
    </DialogContent>
  </Dialog>
- {(["incomes","installments"] as const).map((type)=><SectionCard key={type} title={type === "incomes" ? "수입" : "할부 내역"} summary={{ label: type === "incomes" ? "이달 수입" : "이달 할부 납부", amount: finance[type].reduce((sum, item) => sum + (type === "installments" ? installmentDue(item as Installment, month) : item.date.startsWith(month) ? item.amount : 0), 0) }} action={<IconButton label={type === "incomes" ? "수입 등록" : "할부 등록"} onClick={() => { setKind(type); setRegisterOpen(true); }}><Plus /></IconButton>}>{finance[type].filter((item)=>type === "installments" ? installmentDue(item as Installment,month)>0 : item.date.slice(0,7)===month).map((item)=><div key={item.id} className="flex items-center justify-between gap-2 border-t border-black-010 py-3"><div className="flex min-w-0 flex-col gap-1"><span className="text-xs text-black-030">{item.date}</span><span className="break-words text-sm">{item.memo || "내용 없음"}</span><span className="font-numbers text-base font-semibold">{formatMoney(item.amount)}원 {type === "installments" && ` / ${(item as Installment).months}개월 · 이번 달 ${formatMoney(installmentDue(item as Installment,month))}원`}</span></div><RecordRemoveButton label={`${item.memo || "기록"} 삭제`} onClick={()=>save({...finance,[type]:finance[type].filter((entry)=>entry.id!==item.id)})} /></div>)}<FieldHint>등록한 내역이 이곳에 표시됩니다.</FieldHint></SectionCard>)}
+ <SectionCard title="수입" summary={{ label: "이달 수입", amount: finance.incomes.filter((item) => item.date.startsWith(month)).reduce((sum, item) => sum + item.amount, 0) }} action={<IconButton label="수입 등록" onClick={() => setRegisterOpen(true)}><Plus /></IconButton>}>
+   {finance.incomes.filter((item) => item.date.startsWith(month)).map((item) => <div key={item.id} className="flex items-center justify-between gap-2 border-t border-black-010 py-3"><div className="flex min-w-0 flex-col gap-1"><span className="text-xs text-black-030">{item.date}</span><span className="break-words text-sm">{item.memo || "내용 없음"}</span><span className="font-numbers text-base font-semibold">{formatMoney(item.amount)}원</span></div><RecordRemoveButton label={`${item.memo || "기록"} 삭제`} onClick={() => save({ ...finance, incomes: finance.incomes.filter((entry) => entry.id !== item.id) })} /></div>)}
+   <FieldHint>등록한 내역이 이곳에 표시됩니다.</FieldHint>
+ </SectionCard>
+ <InstallmentsSection month={month} />
  <FixedExpenses month={month} kind="utilities" key={`utilities-${month}`} />
  <div id="fixed-costs" className="scroll-mt-4"><FixedExpenses month={month} /></div>
  </div>;

@@ -240,6 +240,19 @@ export function installmentDue(item: Installment, month: string) {
   const index = (Number(month.slice(0, 4)) - Number(item.date.slice(0, 4))) * 12 + Number(month.slice(5)) - Number(item.date.slice(5, 7));
   return index >= 0 && index < item.months ? Math.floor(item.amount * (index + 1) / item.months) - Math.floor(item.amount * index / item.months) : 0;
 }
+export function installmentSummary(item: Installment, month: string) {
+  const firstMonth = item.date.slice(0, 7);
+  const index = (Number(month.slice(0, 4)) - Number(firstMonth.slice(0, 4))) * 12 + Number(month.slice(5)) - Number(firstMonth.slice(5));
+  const elapsed = Math.max(0, Math.min(item.months, index + 1));
+  const allocated = Math.floor(item.amount * elapsed / item.months);
+  return {
+    firstMonth, lastMonth: nextMonth(firstMonth, item.months - 1),
+    status: index < 0 ? "upcoming" as const : index >= item.months ? "completed" as const : "active" as const,
+    round: index >= 0 && index < item.months ? index + 1 : null,
+    due: installmentDue(item, month), remainingMonths: item.months - elapsed,
+    remainingAmount: item.amount - allocated,
+  };
+}
 export function cardPaymentDate(finance: Finance, chargeDate: string) {
   const closingMonth = nextMonth(chargeDate.slice(0, 7), Number(chargeDate.slice(8)) > (finance.closingDay ?? 31) ? 1 : 0);
   const month = nextMonth(closingMonth, finance.billingOffset ?? 1);

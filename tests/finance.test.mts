@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createDemoData, getCalendarMonth, getPeriod, offsetDate } from "../src/lib/pocket.ts";
-import { allocatedBudget, cashFlow, dailySpendingAllowance, settlementSummary, unsettledExpenses, resizeSettlements, fixedDueDate, fixedTotal, foodBudgetSummary, emptyFinance, financeSummary, installmentDue, isFinance, monthSettings, planSummary, linkPlanExpenses, dailyBudgetStatus, payableSummary, resizeRepayments, changeSessionStart } from "../src/lib/finance.ts";
+import { allocatedBudget, cashFlow, dailySpendingAllowance, settlementSummary, unsettledExpenses, resizeSettlements, fixedDueDate, fixedTotal, foodBudgetSummary, emptyFinance, financeSummary, installmentDue, isFinance, monthSettings, planSummary, linkPlanExpenses, dailyBudgetStatus, payableSummary, resizeRepayments, changeSessionStart, installmentSummary } from "../src/lib/finance.ts";
 function data() { const value = createDemoData("2026-11-02"); value.expenses=[]; value.isDemo=false; value.finance={...emptyFinance(),months:{"2026-11":{budget:300000,groceries:30000}}}; return value; }
 test("월별 하나의 예산을 모든 짧은 주에 배분해도 합계가 동일하다",()=>{const value=data();const month=getCalendarMonth("2026-11",1,[]);assert.equal(month.weeks.reduce((sum,week)=>sum+allocatedBudget(value,week.period),0),300000);assert.equal(allocatedBudget(value,getPeriod("weekly",1,"2026-11-01")),10000);assert.equal(monthSettings(value,"2026-10").budget,0);});
 test("주 경계 이동이 월초 하루짜리 주를 건너뛰지 않는다",()=>{const october=getPeriod("weekly",1,"2026-10-31");const first=getPeriod("weekly",1,offsetDate(october.end,1));assert.equal(first.start,"2026-11-01");assert.equal(first.end,"2026-11-01");assert.equal(getPeriod("weekly",1,offsetDate(first.end,1)).start,"2026-11-02");});
@@ -470,4 +470,25 @@ test("월별 공과금은 생활 예산에서 제외하고 현금·카드 출금
   finance.fixedExpenses[0].endMonth = "2026-11";
   finance.fixedExpenses[0].includeInBudget = true;
   assert.equal(isFinance(finance), false);
+});
+
+
+test("할부 회차·잔액은 첫 납부 월과 선택 월을 따르며 수정한 일정으로 다시 계산한다", () => {
+  const item = { id: "i", date: "2026-11-10", amount: 100001, months: 3, memo: "할부" };
+  assert.deepEqual(installmentSummary(item, "2026-10"), { firstMonth: "2026-11", lastMonth: "2027-01", status: "upcoming", round: null, due: 0, remainingMonths: 3, remainingAmount: 100001 });
+  assert.deepEqual(installmentSummary(item, "2026-12"), { firstMonth: "2026-11", lastMonth: "2027-01", status: "active", round: 2, due: 33334, remainingMonths: 1, remainingAmount: 33334 });
+  assert.equal(installmentSummary(item, "2027-01").round, 3);
+  assert.equal(installmentSummary(item, "2027-01").remainingAmount, 0);
+  assert.equal(installmentSummary(item, "2027-02").status, "completed");
+  const updated = { ...item, date: "2026-10-01", months: 5, amount: 200000 };
+  assert.equal(installmentSummary(updated, "2026-12").round, 3);
+  assert.equal(installmentSummary(updated, "2026-12").due, 40000);
+  assert.equal(installmentSummary(updated, "2026-12").remainingAmount, 80000);
+  const value = data();
+  value.finance!.openingDate = "2026-11-01";
+  value.finance!.installments = [item];
+  assert.equal(cashFlow(value, "2026-11").installmentMonth, 33333);
+  value.finance!.installments = [updated];
+  assert.ok(isFinance(value.finance));
+  assert.equal(cashFlow(value, "2026-11").installmentMonth, 40000);
 });
