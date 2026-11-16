@@ -1,5 +1,7 @@
 "use client";
 
+import { BudgetOverrun } from "@/components/ui/budget-overrun";
+
 import Link from "next/link";
 import { IconLink } from "@/components/ui/icon-link";
 
@@ -86,7 +88,7 @@ export function HomePage({ masked = false, checkingAuth = false }: { masked?: bo
         </div>
         <p className="font-numbers break-all text-4xl font-semibold leading-130 text-black-100">{amountText(Math.abs(remaining))}<span className="text-xl font-medium">원</span></p>
       </div>
-      {!masked && overSpent > 0 && <p className="text-xs leading-150 text-red-2">{dailyView ? "하루 기준" : "주간 예산"} <span className="font-numbers font-semibold">{formatMoney(overSpent)}원</span> 초과</p>}
+      {!masked && overSpent > 0 && <p className="text-xs leading-150"><BudgetOverrun amount={overSpent} label={dailyView ? "하루 기준" : "주간 예산"} /></p>}
       {(masked || budget > 0) && <BudgetUsage percent={masked ? null : usedPercent} label={dailyView || data.mode === "weekly" ? "주 예산" : "월 예산"} />}
       {!masked && overSpent === 0 && budget > 0 && remaining >= 0 && remaining <= 1000 && (
         <p className="rounded-lg bg-black-002 px-3 py-2 text-sm leading-150">이 금액이면 그냥 아껴라</p>

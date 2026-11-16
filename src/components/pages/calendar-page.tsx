@@ -7,6 +7,7 @@ import { RecordRemoveButton } from "@/components/ui/record-remove-button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 import { PeriodPicker } from "@/components/ui/period-picker";
+import { BudgetOverrun } from "@/components/ui/budget-overrun";
 
 import { useState } from "react";
 import { BadgeCheck, Plus } from "lucide-react";
@@ -52,8 +53,13 @@ function CalendarView() {
     <p className="text-xs leading-160 text-black-030">날짜를 선택해 지출과 약속을 확인하세요.</p>
     <section aria-label={`${monthLabel} 날짜별 지출`} className="flex flex-col gap-4">
       <div className="grid grid-cols-7 gap-1">{weekdays.map((day) => <span key={day} className="pb-2 text-center text-xs leading-150 text-black-030">{day.slice(0, 1)}</span>)}</div>
-      {calendar.weeks.map((week) => <div key={week.number} className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center justify-between gap-1 border-t border-black-010 pt-3 text-xs leading-150 text-black-030"><span className="font-semibold">{week.number}주차 예산</span><span className="font-numbers">{formatMoney(week.period.start <= pocket.today ? financeSummary(pocket.data, week.period).budget : allocatedBudget(pocket.data, week.period))}원</span></div>
+      {calendar.weeks.map((week) => {
+        const started = week.period.start <= pocket.today;
+        const summary = started ? financeSummary(pocket.data, week.period) : null;
+        const budget = summary?.budget ?? allocatedBudget(pocket.data, week.period);
+        const overSpent = summary ? Math.max(0, -summary.remaining) : 0;
+        return <div key={week.number} className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-1 border-t border-black-010 pt-3 text-xs leading-150 text-black-030"><span className="font-semibold">{week.number}주차 예산</span><span className="flex flex-wrap items-baseline justify-end gap-x-1 gap-y-0.5"><span className="font-numbers">{formatMoney(budget)}원</span><BudgetOverrun amount={overSpent} parenthesized /></span></div>
         <div className="grid grid-cols-7 gap-1">{week.days.map((day) => day.inMonth ? <PillButton key={day.date} variant="ghost" aria-label={`${day.date}, 지출 ${formatMoney(day.amount)}원, ${day.count}건${day.date === pocket.today ? ", 오늘" : ""}${day.count === 0 && stamps.has(day.date) ? ", 무지출 스탬프" : ""}`} aria-pressed={selected === day.date} aria-current={day.date === pocket.today ? "date" : undefined} onClick={() => { setSelected(day.date); setDayOpen(true); }} className={cn("min-h-16 min-w-0 flex-col justify-start gap-1 rounded-lg border px-0 py-2", selected === day.date ? "border-transparent bg-black-100 text-white hover:bg-black-030 hover:text-white" : day.date === pocket.today ? "border-black-010 bg-white text-black-100" : day.count ? "border-transparent bg-black-002 text-black-100 hover:bg-black-005" : "border-transparent bg-transparent text-black-030 hover:border-black-010 hover:bg-white")}>
           <span className={cn("font-numbers text-sm leading-150", day.date === pocket.today && selected !== day.date && "font-semibold underline underline-offset-4")}>{Number(day.date.slice(8, 10))}</span>
           {day.count > 0 && <span className={cn("font-numbers w-full whitespace-nowrap px-0 text-calendar leading-150", selected === day.date ? "text-white" : "text-black-030")}>{day.amount >= 10000 ? compactMoney.format(day.amount) : formatMoney(day.amount)}</span>}
@@ -62,7 +68,7 @@ function CalendarView() {
             : finance.plans.some((plan) => plan.date === day.date) && <span className="text-calendar leading-150">약속</span>}
           {day.count > 0 && <span aria-hidden="true" className={cn("size-1 rounded-full", selected === day.date ? "bg-white" : "bg-black-100")} />}
         </PillButton> : <span key={day.date} aria-hidden="true" />)}</div>
-      </div>)}
+      </div>; })}
     </section>
     <Dialog open={dayOpen} onOpenChange={setDayOpen}>
       <DialogContent placement="bottom" className="max-h-[75dvh]" aria-describedby="calendar-day-summary">

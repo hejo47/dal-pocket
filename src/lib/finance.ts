@@ -113,6 +113,13 @@ export function changeSessionStart(item: FixedExpense, date: string): FixedExpen
   }
   return { ...item, date, paymentDates };
 }
+export function changeSessionRecordDate(item: FixedExpense, kind: "paymentDates" | "sessionDates", index: number, date: string): FixedExpense {
+  const dates = item[kind] ?? [];
+  if (!isDateKey(date) || !Number.isInteger(index) || index < 0 || index >= dates.length) throw new Error("INVALID_SESSION_RECORD");
+  if (kind === "paymentDates" && index === 0 && dates[0] === item.date) return changeSessionStart(item, date);
+  if (date < item.date) throw new Error("SESSION_RECORD_BEFORE_START");
+  return { ...item, [kind]: dates.map((previous, at) => at === index ? date : previous) };
+}
 export function fixedDueDate(item: FixedExpense, month: string) {
   if (item.cadence === "sessions") return (item.paymentDates ?? []).find((date) => date.slice(0, 7) === month) ?? null;
   if (month < item.date.slice(0, 7) || item.endMonth && month > item.endMonth) return null;
