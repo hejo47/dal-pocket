@@ -148,7 +148,7 @@ export function foodBudgetSummary(data: PocketData, period: Period) {
   const month = period.start.slice(0, 7);
   const rate = monthSettings(data, month).groceries;
   const finance = financeOf(data);
-  const food = data.expenses.filter((expense) => expense.category === "식비" || finance.payments[expense.id]?.groceries);
+  const food = data.expenses.filter((expense) => finance.payments[expense.id]?.groceries === true);
   const allocation = (start: string, end: string) => Math.floor(rate * Number(end.slice(8)) / 7) - Math.floor(rate * (Number(start.slice(8)) - 1) / 7);
   const base = allocation(period.start, period.end);
   // Carry only the food envelope's actual remainder. The shared pool's
@@ -223,7 +223,8 @@ export function dailySpendingAllowance(data: PocketData, date: string) {
     .filter((plan) => plan.date >= date && plan.date <= week.end && !planSummary(data, plan, date).completed)
     .reduce((sum, plan) => sum + plan.amount, 0);
   const remaining = budget - spent - fixed;
-  const available = Math.max(0, Math.floor((remaining - reserved) / week.remainingDays));
+  const daily = dailyBudgetStatus(data, date);
+  const available = Math.max(0, daily.allowance - daily.spent);
   return { available, remaining, reserved, days: week.remainingDays };
 }
 

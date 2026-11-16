@@ -40,8 +40,10 @@ export function HomePage({ masked = false, checkingAuth = false }: { masked?: bo
   const selectedMonth = Number(month.slice(5));
   const day = { start: selectedDate, end: selectedDate };
   const dayExpenses = dailyView ? getPeriodExpenses(data.expenses, day) : [];
-  const daily = dailyView ? dailySpendingAllowance(data, selectedDate) : null;
-  const dailyStatus = dailyView ? dailyBudgetStatus(data, selectedDate) : null;
+  const dayAllowance = dailySpendingAllowance(data, selectedDate);
+  const daily = dailyView ? dayAllowance : null;
+  const dayStatus = dailyBudgetStatus(data, selectedDate);
+  const dailyStatus = dailyView ? dayStatus : null;
   const overSpent = dailyStatus ? dailyStatus.overSpent : data.mode === "weekly" ? Math.max(0, -summary.remaining) : 0;
   const reserved = daily ? daily.reserved : summary.reserved;
   const budget = summary.budget;
@@ -71,11 +73,10 @@ export function HomePage({ masked = false, checkingAuth = false }: { masked?: bo
           <InfoPopover label="예산 계산 기준">
         <div className="flex flex-col gap-2 text-sm leading-160 text-black-030">
           {daily ? (
-            <><p>주 예산 잔액 {amountText(daily.remaining)}원에서 남은 약속 비용 {amountText(daily.reserved)}원을 빼고, 선택한 날을 포함한 {daily.days}일로 나눈 금액이에요.</p><p>하루 초과 여부는 지출 전 기준액 {amountText(dailyStatus?.allowance ?? 0)}원과 비교해요. 당일 약속에 확보한 금액도 포함합니다.</p></>
+            <><p>오늘 지출 전 주 예산에서 남은 약속 비용을 확보하고, 선택일 포함 남은 {daily.days}일로 나눠 하루 기준액을 정해요. 당일 약속에 확보한 금액도 포함합니다.</p><p>하루 기준액 {amountText(dayStatus.allowance)}원 − 오늘 사용액 {amountText(dayStatus.spent)}원 = 추가 사용 가능액 {amountText(daily.available)}원이에요. 오늘 지출을 남은 날짜에 다시 나누지 않아요.</p></>
           ) : <>
             <p>배정 예산에서 사용액을 빼면 남은 예산이에요.</p>
-            <p>하루 사용 가능액 {amountText(dailyBudget)}원 · 선택한 날 포함 {period.remainingDays}일 기준</p>
-            {!masked && summary.reserved > 0 && <p>약속 비용을 확보한 뒤 하루 사용 가능액은 {formatMoney(summary.dailyAvailable)}원이에요.</p>}
+            {data.mode === "weekly" ? <p>남은 {dayAllowance.days}일과 약속을 반영한 하루 기준액 {amountText(dayStatus.allowance)}원에서 오늘 사용액 {amountText(dayStatus.spent)}원을 빼면 {amountText(dayAllowance.available)}원이에요.</p> : <><p>하루 사용 가능액 {amountText(dailyBudget)}원 · 선택한 날 포함 {period.remainingDays}일 기준</p>{!masked && summary.reserved > 0 && <p>약속 비용을 확보한 뒤 하루 사용 가능액은 {formatMoney(summary.dailyAvailable)}원이에요.</p>}</>}
           </>}
           {!masked && food.configured && <p>식비는 전체 예산에 포함돼요. 식비 자체의 미사용액·초과분은 다음 주 식비로 넘기고, 전체 예산 초과에 따른 비례 조정과 겹치는 차감은 한 번만 반영해요.</p>}
           {!masked && (dailyView || data.mode === "weekly") && <div className="flex flex-col gap-1 border-t border-black-010 pt-2">
@@ -96,9 +97,9 @@ export function HomePage({ masked = false, checkingAuth = false }: { masked?: bo
       {!dailyView && data.mode === "weekly" && <div className="flex min-w-0 flex-col gap-1">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <p className="text-sm leading-150">하루 사용 가능액</p>
-          <p className="font-numbers ml-auto break-all text-2xl font-semibold leading-140">{amountText(summary.dailyAvailable)}<span className="text-sm font-medium">원</span></p>
+          <p className="font-numbers ml-auto break-all text-2xl font-semibold leading-140">{amountText(dayAllowance.available)}<span className="text-sm font-medium">원</span></p>
         </div>
-        <p className="text-xs leading-150 text-black-030">남은 약속 비용 제외 · {period.remainingDays}일 기준</p>
+        <p className="text-xs leading-150 text-black-030">약속 반영 · 오늘 사용액 차감 · 남은 {dayAllowance.days}일 기준</p>
       </div>}
       <div className="flex min-w-0 flex-col gap-3 rounded-lg bg-black-002 p-4">
         <dl className="flex flex-wrap gap-4">
@@ -115,7 +116,7 @@ export function HomePage({ masked = false, checkingAuth = false }: { masked?: bo
     <div className="flex flex-col" aria-label="항목별 예산">
       <BudgetSummaryRow title={!masked && food.remaining < 0 ? "식비 초과" : "남은 식비"} amount={masked ? null : food.configured ? Math.abs(food.remaining) : 0}>
         {!masked && (food.configured ? <>
-          <div className="flex flex-col gap-3 pt-2"><dl><MoneyRow label="배정 식비" amount={food.budget} /><MoneyRow label="배정 일반 생활비" amount={food.generalBudget} /><MoneyRow label="사용한 식비" amount={food.spent} /></dl>{food.carriedIn > 0 && <p className="text-xs leading-160 text-black-030">이전 주에 실제로 남긴 식비를 반영했어요.</p>}{food.foodDebt > 0 && <p className="text-xs leading-160 text-black-030">이전 주 식비 초과 {formatMoney(food.foodDebt)}원을 식비에서 차감해요.</p>}{food.proportionalCut > food.foodDebt && <p className="text-xs leading-160 text-black-030">전체 예산 초과 비율에 따른 조정액 {formatMoney(food.proportionalCut)}원과 식비 초과분을 중복 차감하지 않아요.</p>}{food.nextPeriod && <div className="flex flex-col gap-2 border-t border-black-010 pt-3"><dl><MoneyRow label="다음 주 예상 식비" amount={food.nextBudget ?? 0} /></dl><p className="text-sm leading-160 text-black-030">(기본 {formatMoney(food.nextBase ?? 0)}원{food.nextAdjustment !== 0 ? " · " + (food.nextAdjustment > 0 ? "미사용 식비 " : "식비 조정 ") + formatMoney(Math.abs(food.nextAdjustment)) + (food.nextAdjustment > 0 ? "원 가산" : "원 차감") : ""})</p><p className="text-xs leading-160 text-black-030">실제 남긴 식비만 이월하며, 일반 생활비 잔액은 식비에 더하지 않아요.</p>{food.nextFoodDebt > 0 && <p className="text-xs leading-160 text-black-030">식비 초과 {formatMoney(food.nextFoodDebt)}원을 다음 주 식비에서 차감해요. 전체 예산에도 이미 포함된 지출이므로 총예산에서 별도로 한 번 더 빼지 않아요.</p>}</div>}{!food.nextPeriod && food.borrowed > 0 && <p className="text-xs text-black-030">이 기간 식비 초과 {formatMoney(food.borrowed)}원</p>}<p className="text-xs leading-160 text-black-030">식비 분류와 자취 식료품으로 체크한 기록을 합산합니다.</p></div>
+          <div className="flex flex-col gap-3 pt-2"><dl><MoneyRow label="배정 식비" amount={food.budget} /><MoneyRow label="배정 일반 생활비" amount={food.generalBudget} /><MoneyRow label="사용한 식비" amount={food.spent} /></dl>{food.carriedIn > 0 && <p className="text-xs leading-160 text-black-030">이전 주에 실제로 남긴 식비를 반영했어요.</p>}{food.foodDebt > 0 && <p className="text-xs leading-160 text-black-030">이전 주 식비 초과 {formatMoney(food.foodDebt)}원을 식비에서 차감해요.</p>}{food.proportionalCut > food.foodDebt && <p className="text-xs leading-160 text-black-030">전체 예산 초과 비율에 따른 조정액 {formatMoney(food.proportionalCut)}원과 식비 초과분을 중복 차감하지 않아요.</p>}{food.nextPeriod && <div className="flex flex-col gap-2 border-t border-black-010 pt-3"><dl><MoneyRow label="다음 주 예상 식비" amount={food.nextBudget ?? 0} /></dl><p className="text-sm leading-160 text-black-030">(기본 {formatMoney(food.nextBase ?? 0)}원{food.nextAdjustment !== 0 ? " · " + (food.nextAdjustment > 0 ? "미사용 식비 " : "식비 조정 ") + formatMoney(Math.abs(food.nextAdjustment)) + (food.nextAdjustment > 0 ? "원 가산" : "원 차감") : ""})</p><p className="text-xs leading-160 text-black-030">실제 남긴 식비만 이월하며, 일반 생활비 잔액은 식비에 더하지 않아요.</p>{food.nextFoodDebt > 0 && <p className="text-xs leading-160 text-black-030">식비 초과 {formatMoney(food.nextFoodDebt)}원을 다음 주 식비에서 차감해요. 전체 예산에도 이미 포함된 지출이므로 총예산에서 별도로 한 번 더 빼지 않아요.</p>}</div>}{!food.nextPeriod && food.borrowed > 0 && <p className="text-xs text-black-030">이 기간 식비 초과 {formatMoney(food.borrowed)}원</p>}<p className="text-xs leading-160 text-black-030">자취 식료품으로 체크한 지출만 합산합니다. 식비 카테고리만 선택한 지출은 일반 생활비에 반영해요.</p></div>
         </> : <p className="text-xs leading-150 text-black-030">예산 설정에서 식비를 배정해주세요.</p>)}
       </BudgetSummaryRow>
       <HomePlans key={selectedDate} date={selectedDate} amount={reserved} masked={masked} />
