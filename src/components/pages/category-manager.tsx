@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { FieldLabel, SelectField, TextField } from "@/components/ui/form-field";
 import { IconContainer } from "@/components/ui/icon-container";
 import { PillButton } from "@/components/ui/pill-button";
+import { IconButton } from "@/components/ui/icon-button";
+import { ReorderButtons } from "@/components/ui/reorder-buttons";
 
 export function CategoryManager({ onAdded, onDeleted }: {
   onAdded: (name: string) => void;
@@ -51,7 +53,7 @@ export function CategoryManager({ onAdded, onDeleted }: {
         <DialogTitle>{deleting ? "카테고리 삭제" : "카테고리 관리"}</DialogTitle>
         <DialogDescription>{deleting
           ? affected > 0 ? `${deleting} 지출 ${affected}건을 다른 카테고리로 옮긴 뒤 삭제합니다.` : `${deleting} 카테고리를 삭제합니다.`
-          : "카테고리를 추가하거나 삭제할 수 있어요."}</DialogDescription>
+          : "추가·삭제하거나 화살표로 순서를 바꿀 수 있어요. 변경한 순서는 바로 저장됩니다."}</DialogDescription>
       </DialogHeader>
       {deleting ? <>
         {affected > 0 && <div className="flex flex-col gap-2">
@@ -81,14 +83,16 @@ export function CategoryManager({ onAdded, onDeleted }: {
           </div>
           {error && <p role="alert" className="text-xs text-red-2">{error}</p>}
         </form>
-        <ul className="flex flex-wrap gap-2" aria-label="등록된 카테고리">
-          {categories.map((item) => <li key={item} className="inline-flex max-w-full items-center gap-2 rounded-full bg-black-002 py-1 pr-1 pl-3">
-            <span className="min-w-0 break-words text-sm">{item}</span>
-            <PillButton type="button" variant="outline" size="icon" className="shrink-0 rounded-full px-2 py-2 shadow-none"
-              aria-label={`${item} 삭제`} title={`${item} 삭제`} disabled={categories.length <= 1} onClick={() => {
+        <ul className="flex flex-col divide-y divide-black-010" aria-label="등록된 카테고리">
+          {categories.map((item, index) => <li key={item} className="flex min-w-0 items-center justify-between gap-2 py-1">
+            <span className="min-w-0 flex-1 break-words text-sm">{item}</span>
+            <div className="flex shrink-0 items-center">
+            <ReorderButtons label={item} first={index === 0} last={index === categories.length - 1} onMove={(direction) => pocket.moveCategory(item, direction)} />
+            <IconButton label={`${item} 삭제`} disabled={categories.length <= 1} onClick={() => {
                 setDeleting(item);
                 setReplacement(categories.find((candidate) => candidate !== item) ?? "");
-              }}><IconContainer size="sm"><Trash2 /></IconContainer></PillButton>
+              }}><Trash2 /></IconButton>
+            </div>
           </li>)}
         </ul>
       </div>}

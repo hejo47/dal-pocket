@@ -70,6 +70,18 @@ function usePocketController(snapshot: ReturnType<typeof getSnapshot>) {
     notify(affectedCount ? `카테고리를 삭제하고 지출 ${affectedCount}건을 ‘${replacement}’으로 옮겼습니다.` : "카테고리를 삭제했습니다.", persisted);
     return true;
   }
+  function moveCategory(name: string, direction: -1 | 1) {
+    const index = data.categories.indexOf(name);
+    if (index < 0 || index + direction < 0 || index + direction >= data.categories.length) return;
+    const persisted = updatePocket((current) => {
+      const from = current.categories.indexOf(name), to = from + direction;
+      if (from < 0 || to < 0 || to >= current.categories.length) return current;
+      const categories = [...current.categories];
+      [categories[from], categories[to]] = [categories[to], categories[from]];
+      return { ...current, categories };
+    });
+    notify("카테고리 순서를 변경했습니다.", persisted);
+  }
   function saveBudget(amount: number, weekStartsOn: number) {
     const persisted = updatePocket((current) => ({ ...current, budgets: { ...current.budgets, [current.mode]: amount }, weekStartsOn, isDemo: false, expenses: current.isDemo ? [] : current.expenses }));
     notify(data.isDemo ? "예산을 저장하고 내 기록을 시작했습니다." : "예산을 저장했습니다.", persisted);
@@ -138,7 +150,7 @@ function usePocketController(snapshot: ReturnType<typeof getSnapshot>) {
   }
 
   return { data, today, ready, storage, retryCloud, loadServerCopy, period, expenses, summary, category, setCategory, dailyView, setMode,
-    saveBudget, saveMonthlyBudget, saveFinance, addCategory, deleteCategory, notice, dismissNotice, editor, openEditor, savePlanLinks, closeEditor,
+    saveBudget, saveMonthlyBudget, saveFinance, addCategory, deleteCategory, moveCategory, notice, dismissNotice, editor, openEditor, savePlanLinks, closeEditor,
     updateDraft, saveExpense, deleteExpense, restoreEditorFocus, startOwnRecords, saveFonts };
 }
 
