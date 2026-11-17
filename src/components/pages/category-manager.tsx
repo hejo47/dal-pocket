@@ -10,7 +10,7 @@ import { FieldLabel, SelectField, TextField } from "@/components/ui/form-field";
 import { IconContainer } from "@/components/ui/icon-container";
 import { PillButton } from "@/components/ui/pill-button";
 import { IconButton } from "@/components/ui/icon-button";
-import { ReorderButtons } from "@/components/ui/reorder-buttons";
+import { SortableList } from "@/components/ui/sortable-list";
 
 export function CategoryManager({ onAdded, onDeleted }: {
   onAdded: (name: string) => void;
@@ -53,7 +53,7 @@ export function CategoryManager({ onAdded, onDeleted }: {
         <DialogTitle>{deleting ? "카테고리 삭제" : "카테고리 관리"}</DialogTitle>
         <DialogDescription>{deleting
           ? affected > 0 ? `${deleting} 지출 ${affected}건을 다른 카테고리로 옮긴 뒤 삭제합니다.` : `${deleting} 카테고리를 삭제합니다.`
-          : "추가·삭제하거나 화살표로 순서를 바꿀 수 있어요. 변경한 순서는 바로 저장됩니다."}</DialogDescription>
+          : "왼쪽 손잡이를 길게 누른 뒤 드래그해 순서를 바꿔요. 놓으면 바로 저장됩니다."}</DialogDescription>
       </DialogHeader>
       {deleting ? <>
         {affected > 0 && <div className="flex flex-col gap-2">
@@ -83,18 +83,12 @@ export function CategoryManager({ onAdded, onDeleted }: {
           </div>
           {error && <p role="alert" className="text-xs text-red-2">{error}</p>}
         </form>
-        <ul className="flex flex-col divide-y divide-black-010" aria-label="등록된 카테고리">
-          {categories.map((item, index) => <li key={item} className="flex min-w-0 items-center justify-between gap-2 py-1">
-            <span className="min-w-0 flex-1 break-words text-sm">{item}</span>
-            <div className="flex shrink-0 items-center">
-            <ReorderButtons label={item} first={index === 0} last={index === categories.length - 1} onMove={(direction) => pocket.moveCategory(item, direction)} />
+        <SortableList items={categories} label="등록된 카테고리" onMove={pocket.moveCategory} renderAction={(item) =>
             <IconButton label={`${item} 삭제`} disabled={categories.length <= 1} onClick={() => {
                 setDeleting(item);
                 setReplacement(categories.find((candidate) => candidate !== item) ?? "");
               }}><Trash2 /></IconButton>
-            </div>
-          </li>)}
-        </ul>
+        } />
       </div>}
     </DialogContent>
   </Dialog>;

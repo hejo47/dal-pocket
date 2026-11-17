@@ -44,7 +44,7 @@ export function HomePage({ masked = false, checkingAuth = false }: { masked?: bo
   const daily = dailyView ? dayAllowance : null;
   const dayStatus = dailyBudgetStatus(data, selectedDate);
   const dailyStatus = dailyView ? dayStatus : null;
-  const overSpent = dailyStatus ? dailyStatus.overSpent : data.mode === "weekly" ? Math.max(0, -summary.remaining) : 0;
+  const overSpent = dailyStatus ? dailyStatus.overSpent : Math.max(0, -summary.remaining);
   const reserved = daily ? daily.reserved : summary.reserved;
   const budget = summary.budget;
   const spent = dailyView ? sumExpenses(dayExpenses) : summary.spent;
@@ -69,13 +69,13 @@ export function HomePage({ masked = false, checkingAuth = false }: { masked?: bo
     <section aria-label="예산 현황" className="flex flex-col gap-5 border-b border-black-010 pb-6">
       <div className="flex flex-col gap-1">
         <div className="flex items-center">
-          <p className="text-sm leading-150 text-black-030">{daily ? (selectedDate === today ? "오늘 더 쓸 수 있는 금액" : "이날 더 쓸 수 있었던 금액") : !masked && remaining < 0 ? "예산 초과 금액" : "남은 예산"}</p>
+          <p className="text-sm leading-150 text-black-030">{daily ? (selectedDate === today ? "오늘 더 쓸 수 있는 금액" : "이날 더 쓸 수 있었던 금액") : "남은 예산"}</p>
           <InfoPopover label="예산 계산 기준">
         <div className="flex flex-col gap-2 text-sm leading-160 text-black-030">
           {daily ? (
             <><p>오늘 지출 전 주 예산에서 남은 약속 비용을 확보하고, 선택일 포함 남은 {daily.days}일로 나눠 하루 기준액을 정해요. 당일 약속에 확보한 금액도 포함합니다.</p><p>하루 기준액 {amountText(dayStatus.allowance)}원 − 오늘 사용액 {amountText(dayStatus.spent)}원 = 추가 사용 가능액 {amountText(daily.available)}원이에요. 오늘 지출을 남은 날짜에 다시 나누지 않아요.</p></>
           ) : <>
-            <p>배정 예산에서 사용액을 빼면 남은 예산이에요.</p>
+            <p>배정 예산에서 사용액을 뺀 잔액이에요. 모두 쓰면 남은 예산은 0원, 초과액은 작은 붉은 글씨로 따로 표시해요.</p>
             {data.mode === "weekly" ? <p>남은 {dayAllowance.days}일과 약속을 반영한 하루 기준액 {amountText(dayStatus.allowance)}원에서 오늘 사용액 {amountText(dayStatus.spent)}원을 빼면 {amountText(dayAllowance.available)}원이에요.</p> : <><p>하루 사용 가능액 {amountText(dailyBudget)}원 · 선택한 날 포함 {period.remainingDays}일 기준</p>{!masked && summary.reserved > 0 && <p>약속 비용을 확보한 뒤 하루 사용 가능액은 {formatMoney(summary.dailyAvailable)}원이에요.</p>}</>}
           </>}
           {!masked && food.configured && <p>식비는 전체 예산에 포함돼요. 식비 자체의 미사용액·초과분은 다음 주 식비로 넘기고, 전체 예산 초과에 따른 비례 조정과 겹치는 차감은 한 번만 반영해요.</p>}
@@ -87,9 +87,9 @@ export function HomePage({ masked = false, checkingAuth = false }: { masked?: bo
         </div>
           </InfoPopover>
         </div>
-        <p className="font-numbers break-all text-4xl font-semibold leading-130 text-black-100">{amountText(Math.abs(remaining))}<span className="text-xl font-medium">원</span></p>
+        <p className="font-numbers break-all text-4xl font-semibold leading-130 text-black-100">{amountText(Math.max(0, remaining))}<span className="text-xl font-medium">원</span></p>
       </div>
-      {!masked && overSpent > 0 && <p className="text-xs leading-150"><BudgetOverrun amount={overSpent} label={dailyView ? "하루 기준" : "주간 예산"} /></p>}
+      {!masked && overSpent > 0 && <p className="text-xs leading-150"><BudgetOverrun amount={overSpent} label={dailyView ? "하루 기준" : data.mode === "weekly" ? "주간 예산" : "월간 예산"} /></p>}
       {(masked || budget > 0) && <BudgetUsage percent={masked ? null : usedPercent} label={dailyView || data.mode === "weekly" ? "주 예산" : "월 예산"} />}
       {!masked && overSpent === 0 && budget > 0 && remaining >= 0 && remaining <= 1000 && (
         <p className="rounded-lg bg-black-002 px-3 py-2 text-sm leading-150">이 금액이면 그냥 아껴라</p>

@@ -70,14 +70,13 @@ function usePocketController(snapshot: ReturnType<typeof getSnapshot>) {
     notify(affectedCount ? `카테고리를 삭제하고 지출 ${affectedCount}건을 ‘${replacement}’으로 옮겼습니다.` : "카테고리를 삭제했습니다.", persisted);
     return true;
   }
-  function moveCategory(name: string, direction: -1 | 1) {
-    const index = data.categories.indexOf(name);
-    if (index < 0 || index + direction < 0 || index + direction >= data.categories.length) return;
+  function moveCategory(name: string, target: string) {
+    if (name === target || !data.categories.includes(name) || !data.categories.includes(target)) return;
     const persisted = updatePocket((current) => {
-      const from = current.categories.indexOf(name), to = from + direction;
-      if (from < 0 || to < 0 || to >= current.categories.length) return current;
+      const from = current.categories.indexOf(name), to = current.categories.indexOf(target);
+      if (from < 0 || to < 0 || from === to) return current;
       const categories = [...current.categories];
-      [categories[from], categories[to]] = [categories[to], categories[from]];
+      categories.splice(to, 0, categories.splice(from, 1)[0]);
       return { ...current, categories };
     });
     notify("카테고리 순서를 변경했습니다.", persisted);
