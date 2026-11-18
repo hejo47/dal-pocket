@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createDemoData, getCalendarMonth, getPeriod, offsetDate } from "../src/lib/pocket.ts";
-import { allocatedBudget, cashFlow, dailySpendingAllowance, settlementSummary, unsettledExpenses, resizeSettlements, fixedDueDate, fixedTotal, foodBudgetSummary, emptyFinance, financeSummary, installmentDue, isFinance, monthSettings, planSummary, linkPlanExpenses, dailyBudgetStatus, payableSummary, resizeRepayments, changeSessionStart, installmentSummary, changeSessionRecordDate } from "../src/lib/finance.ts";
+import { allocatedBudget, cashFlow, dailySpendingAllowance, settlementSummary, unsettledExpenses, resizeSettlements, fixedDueDate, fixedTotal, foodBudgetSummary, emptyFinance, financeSummary, installmentDue, isFinance, monthSettings, planSummary, linkPlanExpenses, dailyBudgetStatus, payableSummary, resizeRepayments, changeSessionStart, installmentSummary, changeSessionRecordDate, settlementCarryover } from "../src/lib/finance.ts";
 function markGroceries(value: ReturnType<typeof data>, ids: string[]) {
   for (const id of ids) {
     const expense = value.expenses.find((item) => item.id === id)!;
@@ -578,4 +578,40 @@ test("주·월 식비는 카테고리와 무관하게 자취 식료품 체크 �
   assert.equal(foodBudgetSummary(value, week).spent, 3000);
   assert.equal(financeSummary(value, week).spent, 6000);
   assert.equal(foodBudgetSummary(value, week).remaining + foodBudgetSummary(value, week).generalRemaining, financeSummary(value, week).remaining);
+});
+
+
+test("11월 미정산은 12월 분석부터 이월 표시하며 12월 정산이 11월 잔액·카드 표시를 바꾸지 않는다", () => {
+  const value = data();
+  const finance = value.finance!;
+  finance.openingDate = "2026-11-01";
+  finance.openingBalance = 100000;
+  finance.billingDay = 10;
+  finance.billingOffset = 0;
+  finance.closingDay = 31;
+  value.expenses = [
+    { id: "receive", date: "2026-11-03", amount: 10000, category: "데이트", memo: "받을 정산" },
+    { id: "send", date: "2026-11-04", amount: 7000, category: "여가", memo: "보낼 정산" },
+    { id: "later", date: "2026-12-01", amount: 5000, category: "여가", memo: "12월 건" },
+  ];
+  finance.payments.receive = { gross: 30000, split: 3, method: "card", settled: false, settledDate: "2026-11-03", settlements: [] };
+  finance.payments.send = { gross: 7000, split: 1, method: "cash", paidBy: "other", repayments: [], settled: false, settledDate: "2026-11-04" };
+  finance.payments.later = { gross: 10000, split: 2, method: "cash", settled: false, settledDate: "2026-12-01" };
+  const november = cashFlow(value, "2026-11");
+  assert.deepEqual(settlementCarryover(value, "2026-11"), { entries: [], receivable: 0, payable: 0 });
+  assert.equal(settlementCarryover(value, "2026-12").receivable, 20000);
+  assert.equal(settlementCarryover(value, "2026-12").payable, 7000);
+  assert.equal(settlementCarryover(value, "2026-12").entries.length, 2);
+  finance.payments.receive.settlements = [{ count: 1, date: "2026-12-10" }];
+  finance.payments.send.repayments = [{ amount: 7000, date: "2026-12-11" }];
+  assert.equal(cashFlow(value, "2026-11").balance, november.balance);
+  assert.equal(cashFlow(value, "2026-11").cardBill, november.cardBill);
+  assert.equal(settlementCarryover(value, "2026-12").receivable, 10000);
+  assert.equal(settlementCarryover(value, "2026-12").payable, 0);
+  assert.equal(cashFlow(value, "2026-12").received, 10000);
+  assert.equal(cashFlow(value, "2026-12").repaymentOut, 7000);
+  finance.payments.receive.settlements.push({ count: 1, date: "2027-01-10" });
+  assert.equal(settlementCarryover(value, "2026-12").receivable, 10000);
+  assert.equal(settlementCarryover(value, "2027-01").receivable, 5000);
+  assert.equal(cashFlow(value, "2026-11").balance, november.balance);
 });

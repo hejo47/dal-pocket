@@ -68,12 +68,16 @@ export function resizeSettlements(payment: Payment, count: number, date: string)
   if (remaining > 0) result.push({ count: remaining, date });
   return result;
 }
-export function settlementSummary(payment: Payment, ownAmount = Math.ceil(payment.gross / payment.split)) {
+export function settlementSummary(payment: Payment, ownAmount = Math.ceil(payment.gross / payment.split), through?: string) {
   if (payment.paidBy === "other") return { people: 0, count: 0, total: 0, receivedAmount: 0, outstanding: 0 };
   const people = payment.split - 1;
-  const count = settlementRecords(payment).reduce((sum, receipt) => sum + receipt.count, 0);
   const total = Math.max(0, payment.gross - ownAmount);
-  const receivedAmount = people > 0 ? Math.floor(total * count / people) : 0;
+  let count = 0, allocatedCount = 0, receivedAmount = 0;
+  for (const receipt of settlementRecords(payment)) {
+    const portion = people > 0 ? Math.floor(total * (allocatedCount + receipt.count) / people) - Math.floor(total * allocatedCount / people) : 0;
+    allocatedCount += receipt.count;
+    if (!through || receipt.date <= through) { count += receipt.count; receivedAmount += portion; }
+  }
   return { people, count, total, receivedAmount, outstanding: total - receivedAmount };
 }
 export function repaymentRecords(payment: Payment): Repayment[] {
@@ -100,6 +104,24 @@ export function unsettledExpenses(data: PocketData, category = "전체") {
   return data.expenses.filter((expense) => (category === "전체" || expense.category === category) && payments[expense.id] && settlementSummary(payments[expense.id], expense.amount).outstanding > 0).sort((a,b) => b.date.localeCompare(a.date));
 }
 export const financeOf = (data: PocketData): Finance => ({ ...emptyFinance(), ...data.finance });
+export function settlementCarryover(data: PocketData, month: string) {
+  const start = month + "-01", end = getPeriod("monthly", data.weekStartsOn, start).end;
+  const entries: { expense: PocketData["expenses"][number]; direction: "receivable" | "payable"; amount: number }[] = [];
+  const payments = financeOf(data).payments;
+  for (const expense of data.expenses) {
+    if (expense.date >= start) continue;
+    const payment = payments[expense.id];
+    if (!payment) continue;
+    const direction = payment.paidBy === "other" ? "payable" : "receivable";
+    const amount = direction === "payable" ? payableSummary(payment, expense.amount, end).outstanding : settlementSummary(payment, expense.amount, end).outstanding;
+    if (amount > 0) entries.push({ expense, direction, amount });
+  }
+  entries.sort((a, b) => a.expense.date.localeCompare(b.expense.date));
+  return { entries,
+    receivable: entries.filter((entry) => entry.direction === "receivable").reduce((sum, entry) => sum + entry.amount, 0),
+    payable: entries.filter((entry) => entry.direction === "payable").reduce((sum, entry) => sum + entry.amount, 0),
+  };
+}
 export function monthDays(month: string) { return Number(getPeriod("monthly", 1, `${month}-01`).end.slice(8)); }
 export function monthSettings(data: PocketData, month: string) {
   return financeOf(data).months[month] ?? { budget: 0, groceries: 0 };
@@ -315,7 +337,7 @@ export function cashFlow(data: PocketData, month: string) {
       }
       if (expense.date <= end) receivable += total - paidAsOfEnd;
       if (expense.date <= end && payment.method === "card" && dueDate.slice(0, 7) === month) {
-        cardSettlements += settlementSummary(payment, expense.amount).receivedAmount;
+        cardSettlements += settlementSummary(payment, expense.amount, end).receivedAmount;
       }
     }
   }
