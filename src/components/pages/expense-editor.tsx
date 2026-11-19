@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { Trash2 } from "lucide-react";
 
 import { FormDisclosure } from "@/components/ui/form-disclosure";
 import { Switch } from "@/components/ui/switch";
@@ -69,7 +70,7 @@ export function ExpenseEditor() {
           <FieldError>{error}</FieldError>
         </div>
         <DialogFooter><ActionButtonRow buttons={[
-          ...(editing ? [{ label: "삭제", variant: "outline" as const, onClick: pocket.deleteExpense }] : []),
+          ...(editing ? [{ label: "지출 삭제", icon: <Trash2 size={20} />, variant: "outline" as const, onClick: pocket.deleteExpense }] : []),
           { label: "저장", type: "submit" },
         ]} /></DialogFooter>
       </form>

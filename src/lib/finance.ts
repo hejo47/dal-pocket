@@ -3,9 +3,9 @@ import type { PocketData, Period } from "./pocket.ts";
 
 export type MoneyEntry = { id: string; date: string; amount: number; memo: string };
 export type PlanEntry = MoneyEntry & { expenseIds?: string[] };
-export type SavingsEntry = MoneyEntry & { direction: "deposit" | "withdraw" };
+export type SavingsEntry = MoneyEntry & { direction: "deposit" | "withdraw"; fixedExpenseId?: string };
 export type Installment = MoneyEntry & { months: number };
-export type FixedExpense = MoneyEntry & { kind?: "utilities"; endMonth?: string; includeInBudget?: boolean; method?: "cash" | "card"; cadence?: "monthly" | "sessions"; sessionsPerPayment?: number; sessionDates?: string[]; paymentDates?: string[] };
+export type FixedExpense = MoneyEntry & { kind?: "utilities" | "savings"; endMonth?: string; includeInBudget?: boolean; method?: "cash" | "card"; cadence?: "monthly" | "sessions"; sessionsPerPayment?: number; sessionDates?: string[]; paymentDates?: string[] };
 export type Settlement = { count: number; date: string };
 export type Repayment = { amount: number; date: string };
 export type Payment = { paidBy?: "self" | "other"; repayments?: Repayment[]; gross: number; split: number; method: "cash" | "card"; settled: boolean; settledDate: string; note?: string; groceries?: boolean; settlements?: Settlement[] };
@@ -29,10 +29,11 @@ export function isFinance(value: unknown): value is Finance {
     && Array.isArray(data.incomes) && data.incomes.length <= 10000 && data.incomes.every(entry)
     && Array.isArray(data.plans) && data.plans.length <= 10000 && data.plans.every((plan) => entry(plan) && (plan.expenseIds === undefined || Array.isArray(plan.expenseIds) && plan.expenseIds.length <= 10000 && plan.expenseIds.every((id) => typeof id === "string" && id.length > 0 && id.length <= 100) && new Set(plan.expenseIds).size === plan.expenseIds.length))
     && new Set(data.plans.flatMap((plan) => plan.expenseIds ?? [])).size === data.plans.reduce((sum, plan) => sum + (plan.expenseIds?.length ?? 0), 0)
-    && (data.savings === undefined || Array.isArray(data.savings) && data.savings.length <= 10000 && data.savings.every((item) => entry(item) && ["deposit", "withdraw"].includes(item.direction)))
+    && (data.savings === undefined || Array.isArray(data.savings) && data.savings.length <= 10000 && data.savings.every((item) => entry(item) && ["deposit", "withdraw"].includes(item.direction) && (item.fixedExpenseId === undefined || typeof item.fixedExpenseId === "string" && item.fixedExpenseId.length > 0 && item.fixedExpenseId.length <= 100)))
     && (data.noSpendDates === undefined || Array.isArray(data.noSpendDates) && data.noSpendDates.length <= 10000 && data.noSpendDates.every(isDateKey))
     && Array.isArray(data.installments) && data.installments.length <= 1000 && data.installments.every((item) => entry(item) && Number.isInteger(item.months) && item.months >= 2 && item.months <= 60)
-    && (data.fixedExpenses === undefined || Array.isArray(data.fixedExpenses) && data.fixedExpenses.length <= 1000 && data.fixedExpenses.every((item) => entry(item) && (item.kind === undefined || item.kind === "utilities" && item.cadence === "monthly" && item.endMonth === item.date.slice(0, 7) && item.includeInBudget !== true) && (item.method === undefined || ["cash", "card"].includes(item.method)) && (item.cadence === undefined || ["monthly", "sessions"].includes(item.cadence)) && (item.cadence !== "sessions" || Number.isInteger(item.sessionsPerPayment) && item.sessionsPerPayment! >= 1 && item.sessionsPerPayment! <= 100 && Array.isArray(item.sessionDates) && item.sessionDates.length <= 10000 && item.sessionDates.every((date) => isDateKey(date) && date >= item.date) && Array.isArray(item.paymentDates) && item.paymentDates.length >= 1 && item.paymentDates.length <= 10000 && item.paymentDates.every((date) => isDateKey(date) && date >= item.date)) && (item.includeInBudget === undefined || typeof item.includeInBudget === "boolean") && (!item.endMonth || isDateKey(item.endMonth + "-01") && item.endMonth >= item.date.slice(0, 7))))
+    && (data.fixedExpenses === undefined || Array.isArray(data.fixedExpenses) && data.fixedExpenses.length <= 1000 && data.fixedExpenses.every((item) => entry(item) && (item.kind === undefined || item.kind === "utilities" && item.cadence === "monthly" && item.endMonth === item.date.slice(0, 7) && item.includeInBudget !== true || item.kind === "savings" && item.cadence !== "sessions" && item.method !== "card" && !item.includeInBudget) && (item.method === undefined || ["cash", "card"].includes(item.method)) && (item.cadence === undefined || ["monthly", "sessions"].includes(item.cadence)) && (item.cadence !== "sessions" || Number.isInteger(item.sessionsPerPayment) && item.sessionsPerPayment! >= 1 && item.sessionsPerPayment! <= 100 && Array.isArray(item.sessionDates) && item.sessionDates.length <= 10000 && item.sessionDates.every((date) => isDateKey(date) && date >= item.date) && Array.isArray(item.paymentDates) && item.paymentDates.length >= 1 && item.paymentDates.length <= 10000 && item.paymentDates.every((date) => isDateKey(date) && date >= item.date)) && (item.includeInBudget === undefined || typeof item.includeInBudget === "boolean") && (!item.endMonth || isDateKey(item.endMonth + "-01") && item.endMonth >= item.date.slice(0, 7))))
+    && validSavingsLinks(data)
     && !!data.payments && typeof data.payments === "object" && Object.values(data.payments).every((item) => item && amount(item.gross) && (item.paidBy === undefined || ["self", "other"].includes(item.paidBy)) && (item.repayments === undefined || Array.isArray(item.repayments) && item.repayments.length <= 100 && item.repayments.every((sent) => Number.isSafeInteger(sent.amount) && sent.amount > 0 && isDateKey(sent.date)) && (item.paidBy !== "other" || item.repayments.reduce((sum, sent) => sum + sent.amount, 0) <= Math.ceil(item.gross / item.split))) && Number.isInteger(item.split) && item.split >= 1 && item.split <= 100 && ["cash", "card"].includes(item.method) && (item.groceries === undefined || typeof item.groceries === "boolean") && (item.settlements === undefined || Array.isArray(item.settlements) && item.settlements.length <= 100 && item.settlements.every((receipt) => receipt && Number.isInteger(receipt.count) && receipt.count > 0 && isDateKey(receipt.date)) && (item.paidBy === "other" || item.settlements.reduce((sum,receipt) => sum + receipt.count, 0) <= item.split - 1)) && typeof item.settled === "boolean" && isDateKey(item.settledDate) && (item.note === undefined || typeof item.note === "string" && item.note.length <= 200));
 }
 // Resolve actual records, so editing/deleting a linked expense updates the result too.
@@ -147,9 +148,46 @@ export function fixedDueDate(item: FixedExpense, month: string) {
   if (month < item.date.slice(0, 7) || item.endMonth && month > item.endMonth) return null;
   return month + "-" + String(Math.min(Number(item.date.slice(8)), monthDays(month))).padStart(2, "0");
 }
+export function canLinkFixedSaving(item: FixedExpense, date: string) {
+  return item.kind === "savings" && item.cadence !== "sessions" && item.method !== "card" && !item.includeInBudget && fixedDueDate(item, date.slice(0, 7)) !== null;
+}
+export function fixedSavingForMonth(finance: Finance, item: FixedExpense, month: string) {
+  if (!canLinkFixedSaving(item, month + "-01")) return undefined;
+  return (finance.savings ?? []).find((saving) => saving.direction === "deposit" && saving.fixedExpenseId === item.id && saving.date.slice(0, 7) === month);
+}
+export function validSavingsLinks(finance: Finance) {
+  const used = new Set<string>();
+  return (finance.savings ?? []).every((saving) => {
+    if (saving.fixedExpenseId === undefined) return true;
+    const item = (finance.fixedExpenses ?? []).find((fixed) => fixed.id === saving.fixedExpenseId);
+    const key = `${saving.fixedExpenseId}:${saving.date.slice(0, 7)}`;
+    if (saving.direction !== "deposit" || !item || !canLinkFixedSaving(item, saving.date) || used.has(key)) return false;
+    used.add(key);
+    return true;
+  });
+}
+export function linkFixedSaving(finance: Finance, savingsId: string, fixedExpenseId?: string): Finance {
+  if (!(finance.savings ?? []).some((entry) => entry.id === savingsId)) throw new Error("SAVINGS_NOT_FOUND");
+  const next = { ...finance, savings: (finance.savings ?? []).map((entry) => entry.id === savingsId ? { ...entry, fixedExpenseId: fixedExpenseId || undefined } : entry) };
+  if (!validSavingsLinks(next)) throw new Error("INVALID_SAVINGS_LINK");
+  return next;
+}
+export function completeFixedSaving(finance: Finance, fixedId: string, month: string, record: { date: string; amount: number; memo?: string; savingsId?: string }): Finance {
+  const item = (finance.fixedExpenses ?? []).find((entry) => entry.id === fixedId);
+  if (!item || !isDateKey(record.date) || record.date.slice(0, 7) !== month || !canLinkFixedSaving(item, record.date) || !Number.isSafeInteger(record.amount) || record.amount < 1 || record.amount > 100_000_000) throw new Error("INVALID_SAVINGS_PAYMENT");
+  const paid = fixedSavingForMonth(finance, item, month);
+  const existing = record.savingsId ? (finance.savings ?? []).find((entry) => entry.id === record.savingsId) : paid;
+  if (record.savingsId && !existing || paid && existing?.id !== paid.id) throw new Error("ALREADY_PAID_OR_MISSING_RECORD");
+  if (existing && (existing.direction !== "deposit" || existing.date.slice(0, 7) !== month || existing.fixedExpenseId && existing.fixedExpenseId !== item.id)) throw new Error("INVALID_SAVINGS_RECORD");
+  const saving: SavingsEntry = { id: existing?.id ?? crypto.randomUUID(), date: existing?.date && record.savingsId ? existing.date : record.date, amount: existing && record.savingsId ? existing.amount : record.amount, memo: record.memo ?? existing?.memo ?? item.memo, direction: "deposit", fixedExpenseId: item.id };
+  const next = { ...finance, savings: existing ? (finance.savings ?? []).map((entry) => entry.id === existing.id ? saving : entry) : [...(finance.savings ?? []), saving] };
+  if (!validSavingsLinks(next)) throw new Error("INVALID_SAVINGS_LINK");
+  return next;
+}
 export function fixedTotal(data: PocketData, start: string, end: string, budgetOnly = false, method?: "cash" | "card") {
+  const finance = financeOf(data);
   const monthIndex = (month: string) => Number(month.slice(0, 4)) * 12 + Number(month.slice(5, 7));
-  return (financeOf(data).fixedExpenses ?? []).filter((item) => (!budgetOnly || item.includeInBudget) && (!method || (item.method ?? "cash") === method)).reduce((sum, item) => {
+  return (finance.fixedExpenses ?? []).filter((item) => item.kind !== "savings" && (!budgetOnly || item.includeInBudget) && (!method || (item.method ?? "cash") === method)).reduce((sum, item) => {
     if (item.cadence === "sessions") return sum + (item.paymentDates ?? []).filter((date) => date >= start && date <= end).length * item.amount;
     const first = item.date.slice(0, 7) > start.slice(0, 7) ? item.date.slice(0, 7) : start.slice(0, 7);
     const last = item.endMonth && item.endMonth < end.slice(0, 7) ? item.endMonth : end.slice(0, 7);
@@ -372,11 +410,15 @@ export function cashFlow(data: PocketData, month: string) {
   const savedMonth = savings.filter((item) => item.date.slice(0,7) === month && item.direction === "deposit").reduce((sum,item) => sum + item.amount, 0);
   const withdrawnMonth = savings.filter((item) => item.date.slice(0,7) === month && item.direction === "withdraw").reduce((sum,item) => sum + item.amount, 0);
   const savingsBalance = savings.filter((item) => item.date <= end).reduce((sum,item) => sum + (item.direction === "deposit" ? item.amount : -item.amount), 0);
-  const savingsTransfer = savings.filter((item) => inRange(item.date)).reduce((sum,item) => sum + (item.direction === "deposit" ? item.amount : -item.amount), 0);
+  const recurringSavings = (finance.fixedExpenses ?? []).filter((item) => item.kind === "savings");
+  const pendingSavingDates = (item: FixedExpense, start: string, finish: string) => fixedCharges(item, start, finish).filter((date) => !fixedSavingForMonth(finance, item, date.slice(0, 7)));
+  const scheduledSavingsOut = recurringSavings.reduce((sum, item) => sum + pendingSavingDates(item, rangeStart, rangeEnd).length * item.amount, 0);
+  const plannedSavingsMonth = recurringSavings.reduce((sum, item) => sum + pendingSavingDates(item, month + "-01", end).length * item.amount, 0);
+  const savingsTransfer = savings.filter((item) => inRange(item.date)).reduce((sum,item) => sum + (item.direction === "deposit" ? item.amount : -item.amount), 0) + scheduledSavingsOut;
   const netMovement = income + received - cashOut - cardOut - installments - fixedCashOut - savingsTransfer - repaymentOut;
   const balance = finance.openingBalance + (backwards ? -netMovement : netMovement);
   const balanceAfterReceivables = balance + receivable;
   const shortfallAfterReceivables = Math.max(0, -balanceAfterReceivables);
   const availableBalance = balance - futureCard - installmentOutstanding - planned - payable;
-  return { savedMonth, withdrawnMonth, savingsBalance, savingsTransfer, fixedCashOut, fixedCardOut, fixedMonth, fixedOut, monthSpent, availableBalance, installmentOutstanding, futureCard, balance, balanceAfterReceivables, shortfallAfterReceivables, income, cashOut, cardOut, received, receivable, payable, repaymentOut, repaidMonth, installmentMonth, cardBill, cardSettlements, dueThisMonth, planned, recommendedLimit: Math.max(0, Math.min(livingRemaining, availableBalance)) };
+  return { savedMonth, withdrawnMonth, savingsBalance, savingsTransfer, scheduledSavingsOut, plannedSavingsMonth, fixedCashOut, fixedCardOut, fixedMonth, fixedOut, monthSpent, availableBalance, installmentOutstanding, futureCard, balance, balanceAfterReceivables, shortfallAfterReceivables, income, cashOut, cardOut, received, receivable, payable, repaymentOut, repaidMonth, installmentMonth, cardBill, cardSettlements, dueThisMonth, planned, recommendedLimit: Math.max(0, Math.min(livingRemaining, availableBalance)) };
 }

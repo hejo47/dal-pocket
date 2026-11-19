@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createDemoData, getCalendarMonth, getPeriod, offsetDate } from "../src/lib/pocket.ts";
-import { allocatedBudget, cashFlow, dailySpendingAllowance, settlementSummary, unsettledExpenses, resizeSettlements, fixedDueDate, fixedTotal, foodBudgetSummary, emptyFinance, financeSummary, installmentDue, isFinance, monthSettings, planSummary, linkPlanExpenses, dailyBudgetStatus, payableSummary, resizeRepayments, changeSessionStart, installmentSummary, changeSessionRecordDate, settlementCarryover } from "../src/lib/finance.ts";
+import { allocatedBudget, cashFlow, dailySpendingAllowance, settlementSummary, unsettledExpenses, resizeSettlements, fixedDueDate, fixedTotal, foodBudgetSummary, emptyFinance, financeSummary, installmentDue, isFinance, monthSettings, planSummary, linkPlanExpenses, dailyBudgetStatus, payableSummary, resizeRepayments, changeSessionStart, installmentSummary, changeSessionRecordDate, settlementCarryover, linkFixedSaving, fixedSavingForMonth, completeFixedSaving } from "../src/lib/finance.ts";
 function markGroceries(value: ReturnType<typeof data>, ids: string[]) {
   for (const id of ids) {
     const expense = value.expenses.find((item) => item.id === id)!;
@@ -614,4 +614,96 @@ test("11월 미정산은 12월 분석부터 이월 표시하며 12월 정산이 
   assert.equal(settlementCarryover(value, "2026-12").receivable, 10000);
   assert.equal(settlementCarryover(value, "2027-01").receivable, 5000);
   assert.equal(cashFlow(value, "2026-11").balance, november.balance);
+});
+
+
+test("고정 청약과 실제 저축을 연결하면 예정일 대신 실제 날짜·금액으로 한 번만 차감한다", () => {
+  const value = data(), finance = value.finance!;
+  finance.openingDate = "2026-11-01"; finance.openingBalance = 300000;
+  finance.fixedExpenses = [{ kind: "savings", id: "fixed-save", date: "2026-10-14", amount: 100000, memo: "청약", method: "cash", cadence: "monthly", includeInBudget: false }];
+  finance.savings = [{ id: "actual", date: "2026-11-16", amount: 100000, memo: "74회", direction: "deposit" }];
+  assert.equal(cashFlow(value, "2026-11").balance, 100000);
+  value.finance = linkFixedSaving(finance, "actual", "fixed-save");
+  assert.equal(finance.savings[0].fixedExpenseId, undefined);
+  assert.ok(isFinance(value.finance));
+  assert.ok(isFinance(JSON.parse(JSON.stringify(value.finance))));
+  assert.equal(fixedTotal(value, "2026-11-01", "2026-11-15"), 0);
+  assert.equal(fixedTotal(value, "2026-11-01", "2026-11-30"), 0);
+  assert.equal(fixedTotal(value, "2026-12-01", "2026-12-31"), 0);
+  assert.equal(cashFlow(value, "2026-12").plannedSavingsMonth, 100000);
+  assert.equal(cashFlow(value, "2026-11").balance, 200000);
+  assert.equal(cashFlow(value, "2026-11").savedMonth, 100000);
+  assert.equal(cashFlow(value, "2026-11").fixedMonth, 0);
+  assert.equal(financeSummary(value, getPeriod("monthly", 1, "2026-11-16")).spent, 0);
+  assert.equal(fixedSavingForMonth(value.finance, finance.fixedExpenses[0], "2026-11")?.id, "actual");
+  value.finance.savings![0].amount = 90000;
+  assert.equal(cashFlow(value, "2026-11").balance, 210000);
+  value.finance = linkFixedSaving(value.finance, "actual");
+  assert.equal(cashFlow(value, "2026-11").balance, 110000);
+});
+
+test("고정 저축 연결은 같은 달 중복·인출·신용카드·없는 기록·적용 범위 밖을 거부한다", () => {
+  const finance = data().finance!;
+  finance.fixedExpenses = [{ kind: "savings", id: "fixed", date: "2026-11-14", amount: 100000, memo: "저축", method: "cash", endMonth: "2026-11" }];
+  finance.savings = [{ id: "a", date: "2026-11-16", amount: 100000, memo: "", direction: "deposit" }, { id: "b", date: "2026-11-20", amount: 100000, memo: "", direction: "deposit" }, { id: "take", date: "2026-11-20", amount: 1000, memo: "", direction: "withdraw" }, { id: "dec", date: "2026-12-16", amount: 100000, memo: "", direction: "deposit" }];
+  const linked = linkFixedSaving(finance, "a", "fixed");
+  assert.throws(() => linkFixedSaving(linked, "b", "fixed"));
+  assert.throws(() => linkFixedSaving(finance, "take", "fixed"));
+  assert.throws(() => linkFixedSaving(finance, "a", "missing"));
+  assert.throws(() => linkFixedSaving(finance, "missing", "fixed"));
+  assert.throws(() => linkFixedSaving(finance, "dec", "fixed"));
+  finance.fixedExpenses[0].method = "card";
+  assert.throws(() => linkFixedSaving(finance, "a", "fixed"));
+  assert.equal(isFinance({ ...linked, savings: [...linked.savings!, { ...finance.savings[1], fixedExpenseId: "fixed" }] }), false);
+});
+
+test("연결한 저축은 시작 잔액 전후로 날짜가 달라도 과거 잔액 역산에 중복 출금하지 않는다", () => {
+  const value = data(), finance = value.finance!;
+  finance.openingDate = "2026-11-15"; finance.openingBalance = 300000;
+  finance.fixedExpenses = [{ kind: "savings", id: "fixed", date: "2026-10-14", amount: 100000, memo: "청약", method: "cash" }];
+  finance.savings = [{ id: "a", date: "2026-11-16", amount: 100000, memo: "실제 납입", direction: "deposit" }];
+  value.finance = linkFixedSaving(finance, "a", "fixed");
+  assert.equal(cashFlow(value, "2026-11").balance, 200000);
+  assert.equal(cashFlow(value, "2026-10").balance, 300000);
+  value.finance.savings = [];
+  assert.equal(fixedTotal(value, "2026-11-01", "2026-11-30"), 0);
+  assert.equal(cashFlow(value, "2026-10").balance, 400000);
+});
+
+
+test("고정 저축은 납입 완료 시 자동 기록하며 다시 저장해도 월 납입은 한 건뿐이다", () => {
+  const value = data(), finance = value.finance!;
+  finance.openingDate = "2026-11-01"; finance.openingBalance = 300000;
+  finance.fixedExpenses = [{ id: "fixed", kind: "savings", date: "2026-11-14", amount: 100000, memo: "청약", method: "cash", cadence: "monthly" }];
+  assert.equal(cashFlow(value, "2026-11").plannedSavingsMonth, 100000);
+  assert.equal(cashFlow(value, "2026-11").savedMonth, 0);
+  assert.equal(cashFlow(value, "2026-11").balance, 200000);
+  assert.equal(cashFlow(value, "2026-11").fixedMonth, 0);
+  value.finance = completeFixedSaving(finance, "fixed", "2026-11", { date: "2026-11-16", amount: 90000 });
+  assert.ok(isFinance(value.finance));
+  assert.equal(value.finance.savings!.length, 1);
+  assert.equal(cashFlow(value, "2026-11").plannedSavingsMonth, 0);
+  assert.equal(cashFlow(value, "2026-11").savedMonth, 90000);
+  assert.equal(cashFlow(value, "2026-11").balance, 210000);
+  const id = value.finance.savings![0].id;
+  value.finance = completeFixedSaving(value.finance, "fixed", "2026-11", { date: "2026-11-17", amount: 100000 });
+  assert.equal(value.finance.savings!.length, 1);
+  assert.equal(value.finance.savings![0].id, id);
+  assert.equal(cashFlow(value, "2026-11").balance, 200000);
+  assert.equal(cashFlow(value, "2026-12").plannedSavingsMonth, 100000);
+  value.finance.savings = [];
+  assert.equal(cashFlow(value, "2026-11").plannedSavingsMonth, 100000);
+  assert.equal(cashFlow(value, "2026-11").balance, 200000);
+});
+
+test("이미 기록한 저축으로 납입 완료하면 날짜·금액·메모를 보존하고 새 기록을 만들지 않는다", () => {
+  const finance = data().finance!;
+  finance.fixedExpenses = [{ id: "fixed", kind: "savings", date: "2026-11-14", amount: 100000, memo: "청약" }];
+  finance.savings = [{ id: "existing", date: "2026-11-16", amount: 100000, memo: "74회", direction: "deposit" }];
+  const completed = completeFixedSaving(finance, "fixed", "2026-11", { date: "2026-11-19", amount: 1, savingsId: "existing" });
+  assert.equal(completed.savings!.length, 1);
+  assert.deepEqual(completed.savings![0], { ...finance.savings[0], fixedExpenseId: "fixed" });
+  assert.ok(isFinance(completed));
+  assert.throws(() => completeFixedSaving(finance, "fixed", "2026-11", { date: "2026-12-01", amount: 100000 }));
+  assert.throws(() => completeFixedSaving(finance, "fixed", "2026-11", { date: "2026-11-19", amount: 100000, savingsId: "missing" }));
 });

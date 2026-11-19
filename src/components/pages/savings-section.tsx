@@ -24,15 +24,16 @@ export function SavingsSection({ month }: { month: string }) {
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs leading-150 text-black-030"><p>이달 저축 {formatMoney(flow.savedMonth)}원</p><p>이달 인출 {formatMoney(flow.withdrawnMonth)}원</p></div>
     {open && <form className="flex min-w-0 flex-col gap-3 rounded-lg bg-black-002 p-3" onSubmit={(event) => {
       event.preventDefault(); const parsed = parseAmount(amount); if (!validAmount(parsed)) return;
-      pocket.saveFinance({ ...finance, savings: [...(finance.savings ?? []), { id: crypto.randomUUID(), date, amount: parsed, memo, direction }] });
+      const next = { ...finance, savings: [...(finance.savings ?? []), { id: crypto.randomUUID(), date, amount: parsed, memo, direction }] };
+      pocket.saveFinance(next);
       setAmount(""); setMemo(""); setOpen(false);
     }}>
       <FieldLabel htmlFor="savings-direction">기록 종류</FieldLabel><SelectField id="savings-direction" value={direction} options={[{ value: "deposit", label: "저축 계좌로 넣음" }, { value: "withdraw", label: "저축 계좌에서 꺼냄" }]} onChange={(event) => setDirection(event.target.value as typeof direction)} />
-      <FieldLabel htmlFor="savings-date" required>날짜</FieldLabel><DateField id="savings-date" required value={date} onValueChange={(value) => setDate(value)} />
+      <FieldLabel htmlFor="savings-date" required>날짜</FieldLabel><DateField id="savings-date" required value={date} onValueChange={setDate} />
       <FieldLabel htmlFor="savings-amount" required>금액</FieldLabel><TextField id="savings-amount" inputMode="numeric" required value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} />
       <FieldLabel htmlFor="savings-memo">계좌·내용 메모</FieldLabel><TextField id="savings-memo" maxLength={80} placeholder="적금, 비상금 등" value={memo} onChange={(event) => setMemo(event.target.value)} />
       <FieldHint>저축은 소비·생활 예산 합계에 넣지 않습니다. 저축하면 사용 가능한 현금이 줄고, 인출하면 늘어납니다. 시작 현금 잔액에 이미 반영된 이전 저축은 현금 계산 시작일 이전 날짜로 기록하세요.</FieldHint><PillButton type="submit">저축 기록 저장</PillButton>
     </form>}
-    {(finance.savings ?? []).filter((item) => item.date.slice(0,7) === month).sort((a,b) => b.date.localeCompare(a.date)).map((item) => <div key={item.id} className="flex items-center justify-between gap-3 border-t border-black-010 py-3"><div className="flex min-w-0 flex-col gap-1"><p className="break-words text-sm">{item.memo || "저축"}</p><p className="font-numbers text-base font-semibold">{item.direction === "deposit" ? "저축" : "인출"} {formatMoney(item.amount)}원</p><p className="text-xs text-black-030">{item.date}</p></div><RecordRemoveButton label={`${item.memo || "저축 기록"} 삭제`} onClick={() => pocket.saveFinance({ ...finance, savings: (finance.savings ?? []).filter((entry) => entry.id !== item.id) })} /></div>)}
+    {(finance.savings ?? []).filter((item) => item.date.slice(0,7) === month).sort((a,b) => b.date.localeCompare(a.date)).map((item) => <div key={item.id} className="flex items-center justify-between gap-3 border-t border-black-010 py-3"><div className="flex min-w-0 flex-col gap-1"><p className="break-words text-sm">{item.memo || "저축"}</p><p className="font-numbers text-base font-semibold">{item.direction === "deposit" ? "저축" : "인출"} {formatMoney(item.amount)}원</p><p className="text-xs text-black-030">{item.date}</p>{item.fixedExpenseId && <p className="text-xs leading-160 text-black-030">고정 저축 납입 · {finance.fixedExpenses?.find((fixed) => fixed.id === item.fixedExpenseId)?.memo} · 납입 완료</p>}</div><div className="flex shrink-0 gap-1"><RecordRemoveButton label={`${item.memo || "저축 기록"} 삭제`} onClick={() => pocket.saveFinance({ ...finance, savings: (finance.savings ?? []).filter((entry) => entry.id !== item.id) })} /></div></div>)}
   </SectionCard>;
 }
