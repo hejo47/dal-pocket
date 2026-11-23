@@ -21,9 +21,9 @@ export function ExpenseEditor() {
   const [error, setError] = useState("");
   const payment = { gross: parseAmount(editor.draft.amount), split: 1, method: "card" as "cash" | "card", settled: false, settledDate: pocket.today, note: "", groceries: false, ...editor.draft.payment };
   const updatePayment = (patch: Partial<typeof payment>) => updateDraft({ payment: { ...payment, ...patch } });
-  const splitInput = editor.draft.splitInput ?? String(payment.split);
-  const splitValid = Number.isInteger(Number(splitInput)) && Number(splitInput) >= 1 && Number(splitInput) <= 100 && splitInput.trim() !== "";
   const editing = editor.expenseId !== null;
+  const splitInput = editor.draft.splitInput ?? (!editing && payment.split === 1 ? "" : String(payment.split));
+  const splitValid = editor.draft.splitInput === undefined && payment.split === 1 || Number.isInteger(Number(splitInput)) && Number(splitInput) >= 1 && Number(splitInput) <= 100 && splitInput.trim() !== "";
   function submit(event: FormEvent) {
     event.preventDefault();
     const amount = parseAmount(editor.draft.amount);
@@ -47,8 +47,8 @@ export function ExpenseEditor() {
           <div className="flex flex-col gap-3 rounded-lg bg-black-002 p-3">
             <FormDisclosure label={payment.split > 1 ? `나눠 결제 · ${payment.split}명` : payment.paidBy === "other" ? "나눠 결제 · 다른 사람이 결제" : "나눠 결제"} defaultOpen={payment.split > 1 || payment.paidBy === "other"}>
               <FieldLabel htmlFor="expense-split">나눌 인원 (본인 포함)</FieldLabel>
-              <TextField id="expense-split" type="text" inputMode="numeric" required maxLength={3} value={splitInput} onChange={(event) => { const value=event.target.value.replace(/\D/g, ""); const count=Number(value); updateDraft({ splitInput:value, payment:{...payment, settlements:settlementRecords(payment), split:count >= 1 && count <= 100 ? count : payment.split} }); setError(""); }} />
-              <FieldHint>총 {formatMoney(parseAmount(editor.draft.amount))}원 ÷ {payment.split}명 = 내 부담 {formatMoney(Math.ceil(parseAmount(editor.draft.amount) / payment.split))}원. 생활 예산에는 내 부담액만 반영합니다.</FieldHint>
+              <TextField id="expense-split" type="text" inputMode="numeric" required maxLength={3} placeholder="본인 포함 인원수" value={splitInput} onChange={(event) => { const value=event.target.value.replace(/\D/g, ""); const count=Number(value); updateDraft({ splitInput:value, payment:{...payment, settlements:settlementRecords(payment), split:count >= 1 && count <= 100 ? count : payment.split} }); setError(""); }} />
+              {splitInput.trim() !== "" && splitValid ? <FieldHint>총 {formatMoney(parseAmount(editor.draft.amount))}원 ÷ {payment.split}명 = 내 부담 {formatMoney(Math.ceil(parseAmount(editor.draft.amount) / payment.split))}원. 생활 예산에는 내 부담액만 반영합니다.</FieldHint> : <FieldHint>본인을 포함한 인원수를 입력하면 내 부담액을 계산해요.</FieldHint>}
               <FieldLabel htmlFor="expense-payer">누가 결제했나요?</FieldLabel>
               <SelectField id="expense-payer" value={payment.paidBy ?? "self"} options={[{ value: "self", label: "내가 결제 · 받을 정산" }, { value: "other", label: "다른 사람이 결제 · 보낼 정산" }]} onChange={(event) => updatePayment({ paidBy: event.target.value as "self" | "other" })} />
               {(payment.split > 1 || payment.paidBy === "other") && <SettlementEditor payment={payment} onChange={updatePayment} today={pocket.today} />}
